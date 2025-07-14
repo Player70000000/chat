@@ -1,4 +1,4 @@
-# chat_backend.py (producción con .env seguro)
+# chat_backend.py (producción con gestión de canales)
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -12,18 +12,16 @@ app = Flask(__name__)
 CORS(app)
 logging.basicConfig(level=logging.INFO)
 
-# Cargar variables desde .env
 load_dotenv()
-
-# Leer la URI desde variable de entorno
 uri = os.getenv("MONGO_URI")
 client = MongoClient(uri)
 db = client.chat_db
 mensajes = db.mensajes
+canales = db.canales  # nueva colección para los canales
 
 @app.route("/")
 def inicio():
-    return "Servidor de producción activo. Usa /enviar y /mensajes."
+    return "Servidor de producción activo. Usa /enviar, /mensajes, /canales y /crear_canal."
 
 @app.route("/enviar", methods=["POST"])
 def enviar():
@@ -43,6 +41,24 @@ def obtener():
     for m in resultado:
         m["_id"] = str(m.get("_id", ""))
     return jsonify(resultado)
+
+@app.route("/canales", methods=["GET"])
+def listar_canales():
+    lista = list(canales.find({}, {"_id": 0, "nombre": 1}))
+    return jsonify([c["nombre"] for c in lista])
+
+@app.route("/crear_canal", methods=["POST"])
+def crear_canal():
+    data = request.json
+    nombre = data.get("nombre")
+    if not nombre:
+        return jsonify({"error": "Nombre del canal requerido"}), 400
+
+    if canales.find_one({"nombre": nombre}):
+        return jsonify({"error": "El canal ya existe"}), 409
+
+    canales.insert_one({"nombre": nombre, "fecha_creado": datetime.utcnow()})
+    return jsonify({"status": "canal creado", "nombre": nombre})
 
 @app.route("/verificar", methods=["GET"])
 def verificar_estado():

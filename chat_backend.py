@@ -1,17 +1,18 @@
-# chat_backend.py (producción)
+# chat_backend.py (producción actualizado para Render)
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
 from datetime import datetime
 import logging
+import os
 
 app = Flask(__name__)
 CORS(app)
 logging.basicConfig(level=logging.INFO)
 
 # URI real para la base principal en MongoDB Atlas
-client = MongoClient("mongodb+srv://Jhonss:6GvuUcYUFNBFbX7C@cluster0.hxlprze.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+client = MongoClient("mongodb+srv://Jhonss:6GvuUcYUFNBFbX7C@cluster0.hxlprze.mongodb.net/chat_db?retryWrites=true&w=majority&appName=Cluster0")
 db = client.chat_db
 mensajes = db.mensajes
 
@@ -35,7 +36,7 @@ def obtener():
         return jsonify({"error": "Falta el canal"}), 400
     resultado = list(mensajes.find({"canal": canal}).sort("fecha"))
     for m in resultado:
-        m["_id"] = str(m["_id"])
+        m["_id"] = str(m.get("_id", ""))
     return jsonify(resultado)
 
 @app.route("/verificar", methods=["GET"])
@@ -47,4 +48,5 @@ def verificar_estado():
         return jsonify({"status": "error", "mongo": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

@@ -1,5 +1,4 @@
 # main.py
-
 from kivy.app import App
 from kivy.core.window import Window
 from screens.selector import InterfazMensajeriaSelector

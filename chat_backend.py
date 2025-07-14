@@ -1,4 +1,4 @@
-# chat_backend.py (producción actualizado para Render)
+# chat_backend.py (producción con .env seguro)
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -6,13 +6,18 @@ from pymongo import MongoClient
 from datetime import datetime
 import logging
 import os
+from dotenv import load_dotenv
 
 app = Flask(__name__)
 CORS(app)
 logging.basicConfig(level=logging.INFO)
 
-# URI real para la base principal en MongoDB Atlas
-client = MongoClient("mongodb+srv://Jhonss:6GvuUcYUFNBFbX7C@cluster0.hxlprze.mongodb.net/chat_db?retryWrites=true&w=majority&appName=Cluster0")
+# Cargar variables desde .env
+load_dotenv()
+
+# Leer la URI desde variable de entorno
+uri = os.getenv("MONGO_URI")
+client = MongoClient(uri)
 db = client.chat_db
 mensajes = db.mensajes
 

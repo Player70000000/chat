@@ -1,319 +1,301 @@
+import os
+import logging
+from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
-from datetime import datetime, timezone
-import os
-from dotenv import load_dotenv
-import logging
-import sys
+from pymongo.errors import ConnectionFailure, OperationFailure, WriteConcernError
+from flask import Flask, request, jsonify
+from pymongo import MongoClient
+from datetime import datetime
 
-# Configurar logging más detallado
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('app.log')
-    ]
-)
+# Configuración básica de logging
+logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# Configuración MongoDB con logs detallados
-MONGO_URI = os.getenv('MONGO_URI')
-if MONGO_URI:
-    MONGO_URI = MONGO_URI.strip()
-    logger.info(f"🔗 MONGO_URI cargada (primeros 20 chars): {MONGO_URI[:20]}...")
-else:
-    logger.error("❌ MONGO_URI no encontrada en variables de entorno")
+# Variables globales para conexión
+db = None
+client = None
 
-try:
-    # Intentar conexión con diferentes configuraciones
-    logger.info("🔄 Intentando conectar a MongoDB...")
-    
-    # Configuración 1: Con write concern explícito
-    client = MongoClient(
-        MONGO_URI,
-        serverSelectionTimeoutMS=5000,
-        connectTimeoutMS=5000,
-        socketTimeoutMS=5000,
-        retryWrites=True,
-        w=1,
-        wtimeout=5000
-    )
-    
-    # Probar la conexión
-    client.admin.command('ping')
-    logger.info("✅ Conexión a MongoDB exitosa con w=1")
-    
-except Exception as e:
-    logger.error(f"❌ Error conectando con w=1: {str(e)}")
+def init_db():
+    """Inicializa la conexión a MongoDB"""
+    global db, client
     try:
-        # Fallback: Sin write concern explícito
-        logger.info("🔄 Intentando conexión fallback...")
+        mongo_uri = os.getenv('MONGO_URI')
+        if not mongo_uri:
+            logger.error("MONGO_URI no encontrada en variables de entorno")
+            return False
+            
         client = MongoClient(
-            MONGO_URI,
+            mongo_uri,
             serverSelectionTimeoutMS=5000,
             connectTimeoutMS=5000,
             socketTimeoutMS=5000,
-            retryWrites=False
+            retryWrites=True,
+            w='majority'
         )
-        client.admin.command('ping')
-        logger.info("✅ Conexión fallback exitosa")
-    except Exception as e2:
-        logger.error(f"❌ Error en conexión fallback: {str(e2)}")
-        client = None
-
-if client:
-    db = client.chat_db
-    mensajes = db.mensajes
-    canales = db.canales
-    logger.info("📁 Base de datos y colecciones configuradas")
-else:
-    logger.error("❌ No se pudo establecer conexión con MongoDB")
-
-@app.route('/verificar', methods=['GET'])
-def verificar():
-    """Endpoint para verificar estado del servidor y MongoDB"""
-    try:
-        logger.info("🔍 Verificando estado del servidor...")
         
-        # Verificar conexión MongoDB
-        if not client:
-            return jsonify({
-                'status': 'error',
-                'message': 'No hay conexión a MongoDB',
-                'timestamp': datetime.now(timezone.utc).isoformat()
-            }), 500
+        client.admin.command('ping')
+        db = client.chat_db
+        
+        # Crear índices
+        try:
+            db.canales.create_index("nombre", unique=True)
+            db.mensajes.create_index([("canal", 1), ("timestamp", -1)])
+        except Exception:
+            pass  # Índices pueden ya existir
             
-        # Ping a MongoDB
-        client.admin.command('ping')
+        return True
         
-        # Contar documentos en colecciones
-        canales_count = canales.count_documents({})
-        mensajes_count = mensajes.count_documents({})
+    except ConnectionFailure as e:
+        logger.error(f"Error de conexión a MongoDB: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Error inesperado en init_db: {e}")
+        return False
+
+@app.before_first_request
+def initialize():
+    """Inicializa la aplicación"""
+    if not init_db():
+        logger.error("Fallo en inicialización de BD")
+
+@app.route('/', methods=['GET'])
+def pagina_inicio():
+    """Página de inicio de la API"""
+    try:
+        info = {
+            "servicio": "Chat API Backend",
+            "version": "1.0.0",
+            "status": "activo",
+            "timestamp": datetime.now().isoformat(),
+            "endpoints": {
+                "GET /": "Esta página de información",
+                "GET /verificar": "Verificar estado del servidor",
+                "GET /canales": "Listar canales disponibles",
+                "POST /crear_canal": "Crear nuevo canal",
+                "POST /enviar": "Enviar mensaje",
+                "GET /mensajes/<canal>": "Obtener mensajes de canal",
+                "GET /canal/<nombre>": "Obtener información específica de un canal"
+            }
+        }
         
-        logger.info(f"✅ Servidor funcionando - Canales: {canales_count}, Mensajes: {mensajes_count}")
+        if db is not None:
+            try:
+                client.admin.command('ping')
+                canales_count = db.canales.count_documents({})
+                mensajes_count = db.mensajes.count_documents({})
+                info["database"] = {"status": "conectada", "canales": canales_count, "mensajes": mensajes_count}
+            except Exception:
+                info["database"] = {"status": "error"}
+        else:
+            info["database"] = {"status": "no_disponible"}
         
-        return jsonify({
-            'status': 'ok',
-            'message': 'Servidor funcionando correctamente',
-            'mongodb': 'conectado',
-            'canales_count': canales_count,
-            'mensajes_count': mensajes_count,
-            'timestamp': datetime.now(timezone.utc).isoformat()
-        }), 200
+        return jsonify(info)
         
     except Exception as e:
-        logger.error(f"❌ Error en verificación: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'message': f'Error del servidor: {str(e)}',
-            'timestamp': datetime.now(timezone.utc).isoformat()
-        }), 500
+        logger.error(f"Error en página de inicio: {e}")
+        return jsonify({"error": "Error interno"}), 500
+
+@app.route('/verificar', methods=['GET'])
+def verificar_conexion():
+    """Endpoint de verificación"""
+    try:
+        info = {
+            "status": "ok",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        if db is None:
+            info["database"] = "no_inicializada"
+        else:
+            try:
+                client.admin.command('ping')
+                canales_count = db.canales.count_documents({})
+                mensajes_count = db.mensajes.count_documents({})
+                info["database"] = "conectada"
+                info["canales_count"] = canales_count
+                info["mensajes_count"] = mensajes_count
+            except Exception as e:
+                info["database"] = f"error: {str(e)}"
+        
+        return jsonify(info)
+        
+    except Exception as e:
+        logger.error(f"Error en verificar_conexion: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/crear_canal', methods=['POST'])
 def crear_canal():
-    """Endpoint para crear un nuevo canal con logging extenso"""
+    """Crear nuevo canal"""
     try:
-        logger.info("🆕 === INICIANDO CREACIÓN DE CANAL ===")
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+            
+        if not request.is_json:
+            return jsonify({"error": "Content-Type debe ser application/json"}), 400
+            
+        datos = request.get_json()
         
-        # Verificar que hay conexión a MongoDB
-        if not client:
-            logger.error("❌ No hay conexión a MongoDB")
-            return jsonify({
-                'error': 'No hay conexión a la base de datos'
-            }), 500
-        
-        # Obtener datos del request
-        data = request.get_json()
-        logger.info(f"📋 Datos recibidos: {data}")
-        
-        if not data or 'nombre' not in data:
-            logger.error("❌ Datos inválidos - falta 'nombre'")
-            return jsonify({
-                'error': 'Nombre del canal es requerido'
-            }), 400
-        
-        nombre_canal = data['nombre'].strip()
+        if not datos:
+            return jsonify({"error": "No se recibieron datos"}), 400
+            
+        nombre_canal = datos.get('nombre', '').strip()
         if not nombre_canal:
-            logger.error("❌ Nombre de canal vacío")
-            return jsonify({
-                'error': 'Nombre del canal no puede estar vacío'
-            }), 400
+            return jsonify({"error": "El nombre del canal es obligatorio"}), 400
         
-        logger.info(f"📝 Creando canal: '{nombre_canal}'")
-        
-        # Verificar si el canal ya existe
-        logger.info("🔍 Verificando si el canal ya existe...")
-        canal_existente = canales.find_one({'nombre': nombre_canal})
-        
+        # Verificar si canal existe
+        canal_existente = db.canales.find_one({"nombre": nombre_canal})
         if canal_existente:
-            logger.warning(f"⚠️ Canal '{nombre_canal}' ya existe")
-            return jsonify({
-                'error': f'El canal "{nombre_canal}" ya existe'
-            }), 409
+            return jsonify({"error": f"El canal '{nombre_canal}' ya existe"}), 400
         
-        # Preparar documento del canal
+        # Crear canal
         nuevo_canal = {
-            'nombre': nombre_canal,
-            'creado': datetime.now(timezone.utc),
-            'activo': True
+            "nombre": nombre_canal,
+            "creado": datetime.now(),
+            "descripcion": datos.get('descripcion', ''),
+            "activo": True
         }
-        logger.info(f"📄 Documento del canal: {nuevo_canal}")
         
-        # Intentar insertar con diferentes estrategias
-        logger.info("💾 Intentando insertar canal...")
+        resultado = db.canales.insert_one(nuevo_canal)
         
-        try:
-            # Estrategia 1: Con write concern explícito
-            resultado = canales.insert_one(nuevo_canal)
-            logger.info(f"✅ Canal insertado exitosamente - ID: {resultado.inserted_id}")
-            
-        except Exception as insert_error:
-            logger.error(f"❌ Error en inserción con w=1: {str(insert_error)}")
-            
-            try:
-                # Estrategia 2: Sin write concern
-                logger.info("🔄 Intentando inserción sin write concern...")
-                resultado = canales.with_options(write_concern={'w': 0}).insert_one(nuevo_canal)
-                logger.info(f"✅ Canal insertado con w=0 - ID: {resultado.inserted_id}")
-                
-            except Exception as insert_error2:
-                logger.error(f"❌ Error en inserción con w=0: {str(insert_error2)}")
-                return jsonify({
-                    'error': f'Error al guardar el canal: {str(insert_error2)}'
-                }), 500
+        respuesta = {
+            "mensaje": f"Canal '{nombre_canal}' creado exitosamente",
+            "canal_id": str(resultado.inserted_id),
+            "nombre": nombre_canal,
+            "timestamp": datetime.now().isoformat()
+        }
         
-        # Verificar que se guardó correctamente
-        logger.info("🔍 Verificando que el canal se guardó...")
-        canal_guardado = canales.find_one({'nombre': nombre_canal})
+        return jsonify(respuesta), 201
         
-        if canal_guardado:
-            logger.info(f"✅ Canal verificado en base de datos: {canal_guardado['_id']}")
-            return jsonify({
-                'mensaje': f'Canal "{nombre_canal}" creado exitosamente',
-                'canal_id': str(canal_guardado['_id']),
-                'timestamp': datetime.now(timezone.utc).isoformat()
-            }), 201
-        else:
-            logger.error("❌ Canal no encontrado después de inserción")
-            return jsonify({
-                'error': 'Canal creado pero no se puede verificar'
-            }), 500
-            
+    except (WriteConcernError, OperationFailure) as e:
+        logger.error(f"Error de base de datos en crear_canal: {e}")
+        return jsonify({"error": "Error de base de datos"}), 500
     except Exception as e:
-        logger.error(f"❌ ERROR GENERAL en crear_canal: {str(e)}")
-        logger.error(f"❌ Tipo de error: {type(e).__name__}")
-        import traceback
-        logger.error(f"❌ Traceback completo:\n{traceback.format_exc()}")
-        
-        return jsonify({
-            'error': f'Error interno del servidor: {str(e)}'
-        }), 500
+        logger.error(f"Error crítico en crear_canal: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
 
 @app.route('/canales', methods=['GET'])
-def obtener_canales():
-    """Obtener lista de canales con logging"""
+def listar_canales():
+    """Listar todos los canales"""
     try:
-        logger.info("📋 Obteniendo lista de canales...")
-        
-        if not client:
-            return jsonify({'error': 'No hay conexión a MongoDB'}), 500
-        
-        lista_canales = list(canales.find({'activo': True}))
-        
-        for canal in lista_canales:
-            canal['_id'] = str(canal['_id'])
-            if 'creado' in canal:
-                canal['creado'] = canal['creado'].isoformat()
-        
-        logger.info(f"✅ Encontrados {len(lista_canales)} canales")
-        return jsonify(lista_canales), 200
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+            
+        canales = list(db.canales.find({}, {"_id": 0}))
+        return jsonify({"canales": canales})
         
     except Exception as e:
-        logger.error(f"❌ Error obteniendo canales: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error listando canales: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/canal/<nombre>', methods=['GET'])
+def obtener_canal(nombre):
+    """Obtener información específica de un canal por su nombre"""
+    try:
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+        
+        # Buscar el canal en la base de datos
+        canal = db.canales.find_one({"nombre": nombre})
+        
+        if not canal:
+            return jsonify({
+                "error": "Canal no encontrado",
+                "mensaje": f"El canal '{nombre}' no existe"
+            }), 404
+        
+        # Formatear la fecha de creación
+        fecha_creacion = canal.get('creado', '')
+        if isinstance(fecha_creacion, datetime):
+            fecha_creacion = fecha_creacion.strftime('%d/%m/%Y %H:%M')
+        elif isinstance(fecha_creacion, str):
+            try:
+                # Intentar parsear fecha ISO y convertir
+                fecha_obj = datetime.fromisoformat(fecha_creacion.replace('Z', '+00:00'))
+                fecha_creacion = fecha_obj.strftime('%d/%m/%Y %H:%M')
+            except:
+                fecha_creacion = 'Fecha no disponible'
+        else:
+            fecha_creacion = 'Fecha no disponible'
+        
+        # Preparar respuesta con datos básicos del canal
+        respuesta = {
+            "nombre": canal.get('nombre', ''),
+            "descripcion": canal.get('descripcion', 'Sin descripción'),
+            "fecha_creacion": fecha_creacion,
+            "activo": canal.get('activo', True)
+        }
+        
+        return jsonify(respuesta), 200
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo canal '{nombre}': {e}")
+        return jsonify({
+            "error": "Error interno del servidor",
+            "mensaje": str(e)
+        }), 500
 
 @app.route('/enviar', methods=['POST'])
 def enviar_mensaje():
-    """Enviar mensaje con logging"""
+    """Enviar mensaje a un canal"""
     try:
-        logger.info("💬 Enviando mensaje...")
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+            
+        datos = request.get_json()
         
-        if not client:
-            return jsonify({'error': 'No hay conexión a MongoDB'}), 500
-        
-        data = request.get_json()
-        
-        if not data or 'canal' not in data or 'mensaje' not in data:
-            return jsonify({'error': 'Canal y mensaje son requeridos'}), 400
-        
+        if not datos or not datos.get('canal') or not datos.get('mensaje'):
+            return jsonify({"error": "Canal y mensaje son obligatorios"}), 400
+            
         nuevo_mensaje = {
-            'canal': data['canal'],
-            'mensaje': data['mensaje'],
-            'usuario': data.get('usuario', 'Anónimo'),
-            'timestamp': datetime.now(timezone.utc)
+            "canal": datos['canal'],
+            "mensaje": datos['mensaje'],
+            "usuario": datos.get('usuario', 'Anónimo'),
+            "timestamp": datetime.now()
         }
         
-        resultado = mensajes.insert_one(nuevo_mensaje)
-        logger.info(f"✅ Mensaje enviado - ID: {resultado.inserted_id}")
+        resultado = db.mensajes.insert_one(nuevo_mensaje)
         
         return jsonify({
-            'mensaje': 'Mensaje enviado exitosamente',
-            'mensaje_id': str(resultado.inserted_id)
+            "mensaje": "Mensaje enviado exitosamente",
+            "mensaje_id": str(resultado.inserted_id)
         }), 201
         
     except Exception as e:
-        logger.error(f"❌ Error enviando mensaje: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error enviando mensaje: {e}")
+        return jsonify({"error": str(e)}), 500
 
-@app.route('/mensajes', methods=['GET'])
-def obtener_mensajes():
+@app.route('/mensajes/<canal>', methods=['GET'])
+def obtener_mensajes(canal):
     """Obtener mensajes de un canal"""
     try:
-        canal = request.args.get('canal')
-        if not canal:
-            return jsonify({'error': 'Canal es requerido'}), 400
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+            
+        mensajes = list(db.mensajes.find(
+            {"canal": canal}, 
+            {"_id": 0}
+        ).sort("timestamp", 1))
         
-        logger.info(f"📨 Obteniendo mensajes del canal: {canal}")
-        
-        if not client:
-            return jsonify({'error': 'No hay conexión a MongoDB'}), 500
-        
-        lista_mensajes = list(mensajes.find({'canal': canal}).sort('timestamp', 1))
-        
-        for mensaje in lista_mensajes:
-            mensaje['_id'] = str(mensaje['_id'])
-            if 'timestamp' in mensaje:
-                mensaje['timestamp'] = mensaje['timestamp'].isoformat()
-        
-        logger.info(f"✅ Encontrados {len(lista_mensajes)} mensajes")
-        return jsonify(lista_mensajes), 200
+        return jsonify({"mensajes": mensajes})
         
     except Exception as e:
-        logger.error(f"❌ Error obteniendo mensajes: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error obteniendo mensajes: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.errorhandler(404)
 def not_found(error):
-    return jsonify({'error': 'Endpoint no encontrado'}), 404
+    return jsonify({"error": "Endpoint no encontrado"}), 404
 
 @app.errorhandler(500)
 def internal_error(error):
-    logger.error(f"❌ Error 500: {str(error)}")
-    return jsonify({'error': 'Error interno del servidor'}), 500
+    logger.error(f"Error 500: {error}")
+    return jsonify({"error": "Error interno del servidor"}), 500
 
 if __name__ == '__main__':
-    logger.info("🚀 Iniciando servidor Flask...")
-    logger.info(f"🌐 Modo debug: {os.getenv('FLASK_DEBUG', 'False')}")
-    
-    port = int(os.getenv('PORT', 5000))
-    debug = os.getenv('FLASK_ENV') == 'development'
-    
-    logger.info(f"🔧 Puerto: {port}, Debug: {debug}")
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)

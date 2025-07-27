@@ -57,11 +57,13 @@ def init_db():
         logger.error(f"Error inesperado en init_db: {e}")
         return False
 
-@app.before_first_request
 def initialize():
     """Inicializa la aplicación"""
     if not init_db():
         logger.error("Fallo en inicialización de BD")
+
+# Inicializar la base de datos al arrancar
+initialize()
 
 @app.route('/', methods=['GET'])
 def pagina_inicio():

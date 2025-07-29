@@ -81,7 +81,8 @@ def pagina_inicio():
                 "POST /crear_canal": "Crear nuevo canal",
                 "POST /enviar": "Enviar mensaje",
                 "GET /mensajes/<canal>": "Obtener mensajes de canal",
-                "GET /canal/<nombre>": "Obtener información específica de un canal"
+                "GET /canal/<nombre>": "Obtener información específica de un canal",
+                "DELETE /canal/<nombre>": "Eliminar canal y todos sus mensajes"
             }
         }
         
@@ -236,6 +237,63 @@ def obtener_canal(nombre):
         
     except Exception as e:
         logger.error(f"Error obteniendo canal '{nombre}': {e}")
+        return jsonify({
+            "error": "Error interno del servidor",
+            "mensaje": str(e)
+        }), 500
+
+@app.route('/canal/<nombre>', methods=['DELETE'])
+def eliminar_canal(nombre):
+    """Eliminar un canal y todos sus mensajes"""
+    try:
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+        
+        nombre_canal = nombre.strip()
+        if not nombre_canal:
+            return jsonify({"error": "Nombre de canal inválido"}), 400
+        
+        # Verificar si el canal existe
+        canal_existente = db.canales.find_one({"nombre": nombre_canal})
+        if not canal_existente:
+            return jsonify({
+                "error": "Canal no encontrado",
+                "mensaje": f"El canal '{nombre_canal}' no existe"
+            }), 404
+        
+        # Contar mensajes antes de eliminar (para estadísticas)
+        mensajes_count = db.mensajes.count_documents({"canal": nombre_canal})
+        
+        # Eliminar todos los mensajes del canal
+        resultado_mensajes = db.mensajes.delete_many({"canal": nombre_canal})
+        
+        # Eliminar el canal
+        resultado_canal = db.canales.delete_one({"nombre": nombre_canal})
+        
+        if resultado_canal.deleted_count == 0:
+            return jsonify({
+                "error": "No se pudo eliminar el canal",
+                "mensaje": "Error en la operación de eliminación"
+            }), 500
+        
+        # Respuesta exitosa con estadísticas
+        respuesta = {
+            "mensaje": f"Canal '{nombre_canal}' eliminado exitosamente",
+            "canal_eliminado": nombre_canal,
+            "mensajes_eliminados": resultado_mensajes.deleted_count,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return jsonify(respuesta), 200
+        
+    except (WriteConcernError, OperationFailure) as e:
+        logger.error(f"Error de base de datos eliminando canal '{nombre}': {e}")
+        return jsonify({
+            "error": "Error de base de datos",
+            "mensaje": "No se pudo completar la eliminación"
+        }), 500
+    except Exception as e:
+        logger.error(f"Error crítico eliminando canal '{nombre}': {e}")
         return jsonify({
             "error": "Error interno del servidor",
             "mensaje": str(e)

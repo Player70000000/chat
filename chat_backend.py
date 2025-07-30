@@ -1,14 +1,14 @@
 import os
 import logging
+import re
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure, OperationFailure, WriteConcernError
-import re
 
 # Configuración básica de logging
-logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
@@ -24,7 +24,7 @@ def init_db():
     try:
         mongo_uri = os.getenv('MONGO_URI')
         if not mongo_uri:
-            logger.error("MONGO_URI no encontrada en variables de entorno")
+            logger.error("MONGO_URI no encontrada")
             return False
             
         client = MongoClient(
@@ -39,95 +39,105 @@ def init_db():
         client.admin.command('ping')
         db = client.chat_db
         
-        # Crear índices
+        # Crear índices si no existen
         try:
             db.canales.create_index("nombre", unique=True)
             db.mensajes.create_index([("canal", 1), ("timestamp", -1)])
-        except Exception:
-            pass  # Índices pueden ya existir
+        except:
+            pass
             
         return True
         
-    except ConnectionFailure as e:
-        logger.error(f"Error de conexión a MongoDB: {e}")
-        return False
     except Exception as e:
-        logger.error(f"Error inesperado en init_db: {e}")
+        logger.error(f"Error init_db: {e}")
         return False
 
-def initialize():
-    """Inicializa la aplicación"""
-    if not init_db():
-        logger.error("Fallo en inicialización de BD")
+# Inicializar BD
+init_db()
 
-# Inicializar la base de datos al arrancar
-initialize()
+def get_db_status():
+    """Obtener estado de la BD de forma optimizada"""
+    if db is None:
+        return {"status": "no_disponible"}
+    try:
+        client.admin.command('ping')
+        return {
+            "status": "conectada",
+            "canales": db.canales.count_documents({}),
+            "mensajes": db.mensajes.count_documents({})
+        }
+    except:
+        return {"status": "error"}
+
+def format_date(fecha):
+    """Formatear fecha de forma consistente"""
+    if isinstance(fecha, datetime):
+        return fecha.strftime('%d/%m/%Y %H:%M')
+    if isinstance(fecha, str):
+        try:
+            fecha_obj = datetime.fromisoformat(fecha.replace('Z', '+00:00'))
+            return fecha_obj.strftime('%d/%m/%Y %H:%M')
+        except:
+            pass
+    return 'Fecha no disponible'
+
+def validate_canal_data(datos):
+    """Validar datos de canal de forma centralizada"""
+    nombre = datos.get('nombre', '').strip()
+    descripcion = datos.get('descripcion', '').strip()
+    
+    if not nombre:
+        return None, "El nombre del canal es obligatorio"
+    
+    if len(nombre) > 50:
+        return None, "El nombre no puede exceder 50 caracteres"
+    
+    if len(descripcion) > 300:
+        return None, "La descripción no puede exceder 300 caracteres"
+    
+    if not re.match(r'^[a-zA-Z0-9\s\-_#]+$', nombre):
+        return None, "El nombre contiene caracteres no permitidos"
+    
+    return {"nombre": nombre, "descripcion": descripcion}, None
 
 @app.route('/', methods=['GET'])
 def pagina_inicio():
-    """Página de inicio de la API"""
+    """Información del servidor"""
     try:
-        info = {
+        return jsonify({
             "servicio": "Chat API Backend",
             "version": "1.0.0",
             "status": "activo",
             "timestamp": datetime.now().isoformat(),
             "endpoints": {
-                "GET /": "Esta página de información",
-                "GET /verificar": "Verificar estado del servidor",
-                "GET /canales": "Listar canales disponibles",
-                "POST /crear_canal": "Crear nuevo canal",
+                "GET /": "Información del servidor",
+                "GET /verificar": "Estado del servidor",
+                "GET /canales": "Listar canales",
+                "POST /crear_canal": "Crear canal",
+                "GET /canal/<nombre>": "Info de canal",
+                "PUT /canal/<nombre>": "Editar canal",
+                "DELETE /canal/<nombre>": "Eliminar canal",
                 "POST /enviar": "Enviar mensaje",
-                "GET /mensajes/<canal>": "Obtener mensajes de canal",
-                "GET /canal/<nombre>": "Obtener información específica de un canal",
-                "PUT /canal/<nombre>": "Editar nombre y descripción de un canal",
-                "DELETE /canal/<nombre>": "Eliminar canal y todos sus mensajes"
-            }
-        }
-        
-        if db is not None:
-            try:
-                client.admin.command('ping')
-                canales_count = db.canales.count_documents({})
-                mensajes_count = db.mensajes.count_documents({})
-                info["database"] = {"status": "conectada", "canales": canales_count, "mensajes": mensajes_count}
-            except Exception:
-                info["database"] = {"status": "error"}
-        else:
-            info["database"] = {"status": "no_disponible"}
-        
-        return jsonify(info)
-        
+                "GET /mensajes/<canal>": "Obtener mensajes"
+            },
+            "database": get_db_status()
+        })
     except Exception as e:
-        logger.error(f"Error en página de inicio: {e}")
+        logger.error(f"Error inicio: {e}")
         return jsonify({"error": "Error interno"}), 500
 
 @app.route('/verificar', methods=['GET'])
 def verificar_conexion():
-    """Endpoint de verificación"""
+    """Verificación de estado"""
     try:
         info = {
             "status": "ok",
             "timestamp": datetime.now().isoformat()
         }
-        
-        if db is None:
-            info["database"] = "no_inicializada"
-        else:
-            try:
-                client.admin.command('ping')
-                canales_count = db.canales.count_documents({})
-                mensajes_count = db.mensajes.count_documents({})
-                info["database"] = "conectada"
-                info["canales_count"] = canales_count
-                info["mensajes_count"] = mensajes_count
-            except Exception as e:
-                info["database"] = f"error: {str(e)}"
-        
+        info.update(get_db_status())
         return jsonify(info)
-        
     except Exception as e:
-        logger.error(f"Error en verificar_conexion: {e}")
+        logger.error(f"Error verificar: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/crear_canal', methods=['POST'])
@@ -141,43 +151,37 @@ def crear_canal():
             return jsonify({"error": "Content-Type debe ser application/json"}), 400
             
         datos = request.get_json()
-        
         if not datos:
             return jsonify({"error": "No se recibieron datos"}), 400
-            
-        nombre_canal = datos.get('nombre', '').strip()
-        if not nombre_canal:
-            return jsonify({"error": "El nombre del canal es obligatorio"}), 400
         
-        # Verificar si canal existe
-        canal_existente = db.canales.find_one({"nombre": nombre_canal})
-        if canal_existente:
-            return jsonify({"error": f"El canal '{nombre_canal}' ya existe"}), 400
+        datos_validados, error = validate_canal_data(datos)
+        if error:
+            return jsonify({"error": error}), 400
+        
+        # Verificar existencia
+        if db.canales.find_one({"nombre": datos_validados["nombre"]}):
+            return jsonify({"error": f"El canal '{datos_validados['nombre']}' ya existe"}), 400
         
         # Crear canal
-        nuevo_canal = {
-            "nombre": nombre_canal,
+        resultado = db.canales.insert_one({
+            "nombre": datos_validados["nombre"],
+            "descripcion": datos_validados["descripcion"],
             "creado": datetime.now(),
-            "descripcion": datos.get('descripcion', ''),
             "activo": True
-        }
+        })
         
-        resultado = db.canales.insert_one(nuevo_canal)
-        
-        respuesta = {
-            "mensaje": f"Canal '{nombre_canal}' creado exitosamente",
+        return jsonify({
+            "mensaje": f"Canal '{datos_validados['nombre']}' creado exitosamente",
             "canal_id": str(resultado.inserted_id),
-            "nombre": nombre_canal,
+            "nombre": datos_validados["nombre"],
             "timestamp": datetime.now().isoformat()
-        }
-        
-        return jsonify(respuesta), 201
+        }), 201
         
     except (WriteConcernError, OperationFailure) as e:
-        logger.error(f"Error de base de datos en crear_canal: {e}")
+        logger.error(f"Error BD crear_canal: {e}")
         return jsonify({"error": "Error de base de datos"}), 500
     except Exception as e:
-        logger.error(f"Error crítico en crear_canal: {e}")
+        logger.error(f"Error crear_canal: {e}")
         return jsonify({"error": "Error interno del servidor"}), 500
 
 @app.route('/canales', methods=['GET'])
@@ -186,64 +190,42 @@ def listar_canales():
     try:
         if db is None:
             return jsonify({"error": "Base de datos no disponible"}), 500
-            
+        
         canales = list(db.canales.find({}, {"_id": 0}))
         return jsonify({"canales": canales})
         
     except Exception as e:
-        logger.error(f"Error listando canales: {e}")
+        logger.error(f"Error listar canales: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/canal/<nombre>', methods=['GET'])
 def obtener_canal(nombre):
-    """Obtener información específica de un canal por su nombre"""
+    """Obtener información de un canal"""
     try:
         if db is None:
             return jsonify({"error": "Base de datos no disponible"}), 500
         
-        # Buscar el canal en la base de datos
         canal = db.canales.find_one({"nombre": nombre})
-        
         if not canal:
             return jsonify({
                 "error": "Canal no encontrado",
                 "mensaje": f"El canal '{nombre}' no existe"
             }), 404
         
-        # Formatear la fecha de creación
-        fecha_creacion = canal.get('creado', '')
-        if isinstance(fecha_creacion, datetime):
-            fecha_creacion = fecha_creacion.strftime('%d/%m/%Y %H:%M')
-        elif isinstance(fecha_creacion, str):
-            try:
-                # Intentar parsear fecha ISO y convertir
-                fecha_obj = datetime.fromisoformat(fecha_creacion.replace('Z', '+00:00'))
-                fecha_creacion = fecha_obj.strftime('%d/%m/%Y %H:%M')
-            except:
-                fecha_creacion = 'Fecha no disponible'
-        else:
-            fecha_creacion = 'Fecha no disponible'
-        
-        # Preparar respuesta con datos básicos del canal
-        respuesta = {
+        return jsonify({
             "nombre": canal.get('nombre', ''),
             "descripcion": canal.get('descripcion', 'Sin descripción'),
-            "fecha_creacion": fecha_creacion,
+            "fecha_creacion": format_date(canal.get('creado', '')),
             "activo": canal.get('activo', True)
-        }
-        
-        return jsonify(respuesta), 200
+        }), 200
         
     except Exception as e:
-        logger.error(f"Error obteniendo canal '{nombre}': {e}")
-        return jsonify({
-            "error": "Error interno del servidor",
-            "mensaje": str(e)
-        }), 500
+        logger.error(f"Error obtener canal '{nombre}': {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
 
 @app.route('/canal/<nombre>', methods=['PUT'])
 def editar_canal(nombre):
-    """Editar nombre y/o descripción de un canal"""
+    """Editar canal"""
     try:
         if db is None:
             return jsonify({"error": "Base de datos no disponible"}), 500
@@ -257,64 +239,45 @@ def editar_canal(nombre):
         
         nombre_actual = nombre.strip()
         if not nombre_actual:
-            return jsonify({"error": "Nombre de canal actual inválido"}), 400
+            return jsonify({"error": "Nombre de canal inválido"}), 400
         
-        # Verificar si el canal existe
-        canal_existente = db.canales.find_one({"nombre": nombre_actual})
-        if not canal_existente:
+        # Verificar existencia del canal
+        if not db.canales.find_one({"nombre": nombre_actual}):
             return jsonify({
                 "error": "Canal no encontrado",
                 "mensaje": f"El canal '{nombre_actual}' no existe"
             }), 404
         
-        # Obtener nuevos valores
-        nuevo_nombre = datos.get('nombre', '').strip()
-        nueva_descripcion = datos.get('descripcion', '').strip()
+        # Validar datos
+        datos_validados, error = validate_canal_data(datos)
+        if error:
+            return jsonify({"error": error}), 400
         
-        # Validaciones
-        if not nuevo_nombre:
-            return jsonify({"error": "El nombre del canal es obligatorio"}), 400
-        
-        if len(nuevo_nombre) > 50:
-            return jsonify({"error": "El nombre del canal no puede exceder 50 caracteres"}), 400
-        
-        if len(nueva_descripcion) > 300:
-            return jsonify({"error": "La descripción no puede exceder 300 caracteres"}), 400
-        
-        # Validar caracteres permitidos en el nombre
-        if not re.match(r'^[a-zA-Z0-9\s\-_#]+$', nuevo_nombre):
-            return jsonify({"error": "El nombre contiene caracteres no permitidos. Solo se permiten letras, números, espacios, guiones y #"}), 400
-        
-        # Si se cambia el nombre, verificar que no exista otro canal con ese nombre
+        nuevo_nombre = datos_validados["nombre"]
+        nueva_descripcion = datos_validados["descripcion"]
         nombre_cambio = nuevo_nombre != nombre_actual
-        if nombre_cambio:
-            canal_duplicado = db.canales.find_one({"nombre": nuevo_nombre})
-            if canal_duplicado:
-                return jsonify({
-                    "error": "Nombre ya utilizado",
-                    "mensaje": f"Ya existe un canal con el nombre '{nuevo_nombre}'"
-                }), 400
         
-        # Preparar datos de actualización
-        datos_actualizacion = {
-            "nombre": nuevo_nombre,
-            "descripcion": nueva_descripcion,
-            "modificado": datetime.now()
-        }
+        # Verificar duplicado si se cambia nombre
+        if nombre_cambio and db.canales.find_one({"nombre": nuevo_nombre}):
+            return jsonify({
+                "error": "Nombre ya utilizado",
+                "mensaje": f"Ya existe un canal con el nombre '{nuevo_nombre}'"
+            }), 400
         
-        # Actualizar el canal
+        # Actualizar canal
         resultado_canal = db.canales.update_one(
             {"nombre": nombre_actual},
-            {"$set": datos_actualizacion}
+            {"$set": {
+                "nombre": nuevo_nombre,
+                "descripcion": nueva_descripcion,
+                "modificado": datetime.now()
+            }}
         )
         
         if resultado_canal.modified_count == 0:
-            return jsonify({
-                "error": "No se pudo actualizar el canal",
-                "mensaje": "Error en la operación de actualización"
-            }), 500
+            return jsonify({"error": "No se pudo actualizar el canal"}), 500
         
-        # Si se cambió el nombre, actualizar todos los mensajes asociados
+        # Actualizar mensajes si cambió el nombre
         mensajes_actualizados = 0
         if nombre_cambio:
             resultado_mensajes = db.mensajes.update_many(
@@ -323,8 +286,7 @@ def editar_canal(nombre):
             )
             mensajes_actualizados = resultado_mensajes.modified_count
         
-        # Respuesta exitosa
-        respuesta = {
+        return jsonify({
             "mensaje": "Canal actualizado exitosamente",
             "canal_anterior": nombre_actual,
             "canal_nuevo": nuevo_nombre,
@@ -332,26 +294,18 @@ def editar_canal(nombre):
             "nombre_cambio": nombre_cambio,
             "mensajes_actualizados": mensajes_actualizados,
             "timestamp": datetime.now().isoformat()
-        }
-        
-        return jsonify(respuesta), 200
+        }), 200
         
     except (WriteConcernError, OperationFailure) as e:
-        logger.error(f"Error de base de datos editando canal '{nombre}': {e}")
-        return jsonify({
-            "error": "Error de base de datos",
-            "mensaje": "No se pudo completar la actualización"
-        }), 500
+        logger.error(f"Error BD editar canal '{nombre}': {e}")
+        return jsonify({"error": "Error de base de datos"}), 500
     except Exception as e:
-        logger.error(f"Error crítico editando canal '{nombre}': {e}")
-        return jsonify({
-            "error": "Error interno del servidor",
-            "mensaje": str(e)
-        }), 500
+        logger.error(f"Error editar canal '{nombre}': {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
 
 @app.route('/canal/<nombre>', methods=['DELETE'])
 def eliminar_canal(nombre):
-    """Eliminar un canal y todos sus mensajes"""
+    """Eliminar canal y mensajes"""
     try:
         if db is None:
             return jsonify({"error": "Base de datos no disponible"}), 500
@@ -360,72 +314,51 @@ def eliminar_canal(nombre):
         if not nombre_canal:
             return jsonify({"error": "Nombre de canal inválido"}), 400
         
-        # Verificar si el canal existe
-        canal_existente = db.canales.find_one({"nombre": nombre_canal})
-        if not canal_existente:
+        # Verificar existencia
+        if not db.canales.find_one({"nombre": nombre_canal}):
             return jsonify({
                 "error": "Canal no encontrado",
                 "mensaje": f"El canal '{nombre_canal}' no existe"
             }), 404
         
-        # Contar mensajes antes de eliminar (para estadísticas)
-        mensajes_count = db.mensajes.count_documents({"canal": nombre_canal})
-        
-        # Eliminar todos los mensajes del canal
+        # Eliminar mensajes y canal
         resultado_mensajes = db.mensajes.delete_many({"canal": nombre_canal})
-        
-        # Eliminar el canal
         resultado_canal = db.canales.delete_one({"nombre": nombre_canal})
         
         if resultado_canal.deleted_count == 0:
-            return jsonify({
-                "error": "No se pudo eliminar el canal",
-                "mensaje": "Error en la operación de eliminación"
-            }), 500
+            return jsonify({"error": "No se pudo eliminar el canal"}), 500
         
-        # Respuesta exitosa con estadísticas
-        respuesta = {
+        return jsonify({
             "mensaje": f"Canal '{nombre_canal}' eliminado exitosamente",
             "canal_eliminado": nombre_canal,
             "mensajes_eliminados": resultado_mensajes.deleted_count,
             "timestamp": datetime.now().isoformat()
-        }
-        
-        return jsonify(respuesta), 200
+        }), 200
         
     except (WriteConcernError, OperationFailure) as e:
-        logger.error(f"Error de base de datos eliminando canal '{nombre}': {e}")
-        return jsonify({
-            "error": "Error de base de datos",
-            "mensaje": "No se pudo completar la eliminación"
-        }), 500
+        logger.error(f"Error BD eliminar canal '{nombre}': {e}")
+        return jsonify({"error": "Error de base de datos"}), 500
     except Exception as e:
-        logger.error(f"Error crítico eliminando canal '{nombre}': {e}")
-        return jsonify({
-            "error": "Error interno del servidor",
-            "mensaje": str(e)
-        }), 500
+        logger.error(f"Error eliminar canal '{nombre}': {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
 
 @app.route('/enviar', methods=['POST'])
 def enviar_mensaje():
-    """Enviar mensaje a un canal"""
+    """Enviar mensaje"""
     try:
         if db is None:
             return jsonify({"error": "Base de datos no disponible"}), 500
             
         datos = request.get_json()
-        
         if not datos or not datos.get('canal') or not datos.get('mensaje'):
             return jsonify({"error": "Canal y mensaje son obligatorios"}), 400
-            
-        nuevo_mensaje = {
+        
+        resultado = db.mensajes.insert_one({
             "canal": datos['canal'],
             "mensaje": datos['mensaje'],
             "usuario": datos.get('usuario', 'Anónimo'),
             "timestamp": datetime.now()
-        }
-        
-        resultado = db.mensajes.insert_one(nuevo_mensaje)
+        })
         
         return jsonify({
             "mensaje": "Mensaje enviado exitosamente",
@@ -433,16 +366,16 @@ def enviar_mensaje():
         }), 201
         
     except Exception as e:
-        logger.error(f"Error enviando mensaje: {e}")
+        logger.error(f"Error enviar mensaje: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/mensajes/<canal>', methods=['GET'])
 def obtener_mensajes(canal):
-    """Obtener mensajes de un canal"""
+    """Obtener mensajes de canal"""
     try:
         if db is None:
             return jsonify({"error": "Base de datos no disponible"}), 500
-            
+        
         mensajes = list(db.mensajes.find(
             {"canal": canal}, 
             {"_id": 0}
@@ -451,7 +384,7 @@ def obtener_mensajes(canal):
         return jsonify({"mensajes": mensajes})
         
     except Exception as e:
-        logger.error(f"Error obteniendo mensajes: {e}")
+        logger.error(f"Error obtener mensajes: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.errorhandler(404)

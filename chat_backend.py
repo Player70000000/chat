@@ -5,9 +5,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure, OperationFailure, WriteConcernError
-from flask import Flask, request, jsonify
-from pymongo import MongoClient
-from datetime import datetime
+import re
 
 # Configuración básica de logging
 logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -82,6 +80,7 @@ def pagina_inicio():
                 "POST /enviar": "Enviar mensaje",
                 "GET /mensajes/<canal>": "Obtener mensajes de canal",
                 "GET /canal/<nombre>": "Obtener información específica de un canal",
+                "PUT /canal/<nombre>": "Editar nombre y descripción de un canal",
                 "DELETE /canal/<nombre>": "Eliminar canal y todos sus mensajes"
             }
         }
@@ -237,6 +236,114 @@ def obtener_canal(nombre):
         
     except Exception as e:
         logger.error(f"Error obteniendo canal '{nombre}': {e}")
+        return jsonify({
+            "error": "Error interno del servidor",
+            "mensaje": str(e)
+        }), 500
+
+@app.route('/canal/<nombre>', methods=['PUT'])
+def editar_canal(nombre):
+    """Editar nombre y/o descripción de un canal"""
+    try:
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+        
+        if not request.is_json:
+            return jsonify({"error": "Content-Type debe ser application/json"}), 400
+        
+        datos = request.get_json()
+        if not datos:
+            return jsonify({"error": "No se recibieron datos"}), 400
+        
+        nombre_actual = nombre.strip()
+        if not nombre_actual:
+            return jsonify({"error": "Nombre de canal actual inválido"}), 400
+        
+        # Verificar si el canal existe
+        canal_existente = db.canales.find_one({"nombre": nombre_actual})
+        if not canal_existente:
+            return jsonify({
+                "error": "Canal no encontrado",
+                "mensaje": f"El canal '{nombre_actual}' no existe"
+            }), 404
+        
+        # Obtener nuevos valores
+        nuevo_nombre = datos.get('nombre', '').strip()
+        nueva_descripcion = datos.get('descripcion', '').strip()
+        
+        # Validaciones
+        if not nuevo_nombre:
+            return jsonify({"error": "El nombre del canal es obligatorio"}), 400
+        
+        if len(nuevo_nombre) > 50:
+            return jsonify({"error": "El nombre del canal no puede exceder 50 caracteres"}), 400
+        
+        if len(nueva_descripcion) > 300:
+            return jsonify({"error": "La descripción no puede exceder 300 caracteres"}), 400
+        
+        # Validar caracteres permitidos en el nombre
+        if not re.match(r'^[a-zA-Z0-9\s\-_#]+$', nuevo_nombre):
+            return jsonify({"error": "El nombre contiene caracteres no permitidos. Solo se permiten letras, números, espacios, guiones y #"}), 400
+        
+        # Si se cambia el nombre, verificar que no exista otro canal con ese nombre
+        nombre_cambio = nuevo_nombre != nombre_actual
+        if nombre_cambio:
+            canal_duplicado = db.canales.find_one({"nombre": nuevo_nombre})
+            if canal_duplicado:
+                return jsonify({
+                    "error": "Nombre ya utilizado",
+                    "mensaje": f"Ya existe un canal con el nombre '{nuevo_nombre}'"
+                }), 400
+        
+        # Preparar datos de actualización
+        datos_actualizacion = {
+            "nombre": nuevo_nombre,
+            "descripcion": nueva_descripcion,
+            "modificado": datetime.now()
+        }
+        
+        # Actualizar el canal
+        resultado_canal = db.canales.update_one(
+            {"nombre": nombre_actual},
+            {"$set": datos_actualizacion}
+        )
+        
+        if resultado_canal.modified_count == 0:
+            return jsonify({
+                "error": "No se pudo actualizar el canal",
+                "mensaje": "Error en la operación de actualización"
+            }), 500
+        
+        # Si se cambió el nombre, actualizar todos los mensajes asociados
+        mensajes_actualizados = 0
+        if nombre_cambio:
+            resultado_mensajes = db.mensajes.update_many(
+                {"canal": nombre_actual},
+                {"$set": {"canal": nuevo_nombre}}
+            )
+            mensajes_actualizados = resultado_mensajes.modified_count
+        
+        # Respuesta exitosa
+        respuesta = {
+            "mensaje": "Canal actualizado exitosamente",
+            "canal_anterior": nombre_actual,
+            "canal_nuevo": nuevo_nombre,
+            "descripcion": nueva_descripcion,
+            "nombre_cambio": nombre_cambio,
+            "mensajes_actualizados": mensajes_actualizados,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return jsonify(respuesta), 200
+        
+    except (WriteConcernError, OperationFailure) as e:
+        logger.error(f"Error de base de datos editando canal '{nombre}': {e}")
+        return jsonify({
+            "error": "Error de base de datos",
+            "mensaje": "No se pudo completar la actualización"
+        }), 500
+    except Exception as e:
+        logger.error(f"Error crítico editando canal '{nombre}': {e}")
         return jsonify({
             "error": "Error interno del servidor",
             "mensaje": str(e)

@@ -6,6 +6,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure, OperationFailure, WriteConcernError
+from bson import ObjectId
+from bson.errors import InvalidId
 
 # Configuración básica de logging
 logging.basicConfig(level=logging.ERROR)
@@ -43,6 +45,8 @@ def init_db():
         try:
             db.canales.create_index("nombre", unique=True)
             db.mensajes.create_index([("canal", 1), ("timestamp", -1)])
+            # NUEVO: Índice para buscar mensajes por usuario y estado
+            db.mensajes.create_index([("usuario", 1), ("_id", 1)])
         except:
             pass
             
@@ -100,13 +104,32 @@ def validate_canal_data(datos):
     
     return {"nombre": nombre, "descripcion": descripcion}, None
 
+def validate_message_data(datos):
+    """Validar datos de mensaje - NUEVA FUNCIÓN"""
+    mensaje = datos.get('mensaje', '').strip()
+    
+    if not mensaje:
+        return None, "El mensaje no puede estar vacío"
+    
+    if len(mensaje) > 1000:
+        return None, "El mensaje no puede exceder 1000 caracteres"
+    
+    return {"mensaje": mensaje}, None
+
+def validate_object_id(id_string):
+    """Validar y convertir string a ObjectId - NUEVA FUNCIÓN"""
+    try:
+        return ObjectId(id_string)
+    except (InvalidId, TypeError):
+        return None
+
 @app.route('/', methods=['GET'])
 def pagina_inicio():
     """Información del servidor"""
     try:
         return jsonify({
             "servicio": "Chat API Backend",
-            "version": "1.0.0",
+            "version": "2.0.0",  # ACTUALIZADA
             "status": "activo",
             "timestamp": datetime.now().isoformat(),
             "endpoints": {
@@ -118,7 +141,11 @@ def pagina_inicio():
                 "PUT /canal/<nombre>": "Editar canal",
                 "DELETE /canal/<nombre>": "Eliminar canal",
                 "POST /enviar": "Enviar mensaje",
-                "GET /mensajes/<canal>": "Obtener mensajes"
+                "GET /mensajes/<canal>": "Obtener mensajes",
+                # NUEVOS ENDPOINTS
+                "PUT /mensaje/<id>": "Editar mensaje propio",
+                "DELETE /mensaje/<id>": "Eliminar mensaje propio",
+                "PUT /mensaje/<id>/estado": "Actualizar estado de mensaje"
             },
             "database": get_db_status()
         })
@@ -344,7 +371,7 @@ def eliminar_canal(nombre):
 
 @app.route('/enviar', methods=['POST'])
 def enviar_mensaje():
-    """Enviar mensaje"""
+    """Enviar mensaje - MEJORADO CON ESTADOS"""
     try:
         if db is None:
             return jsonify({"error": "Base de datos no disponible"}), 500
@@ -353,16 +380,29 @@ def enviar_mensaje():
         if not datos or not datos.get('canal') or not datos.get('mensaje'):
             return jsonify({"error": "Canal y mensaje son obligatorios"}), 400
         
-        resultado = db.mensajes.insert_one({
+        # NUEVO: Validar contenido del mensaje
+        datos_mensaje, error = validate_message_data(datos)
+        if error:
+            return jsonify({"error": error}), 400
+        
+        # NUEVO: Estructura mejorada con estados
+        documento_mensaje = {
             "canal": datos['canal'],
-            "mensaje": datos['mensaje'],
+            "mensaje": datos_mensaje['mensaje'],
             "usuario": datos.get('usuario', 'Anónimo'),
-            "timestamp": datetime.now()
-        })
+            "timestamp": datetime.now(),
+            "estado": "enviado",        # NUEVO: Estado inicial
+            "editado": False,           # NUEVO: Flag de edición
+            "fecha_edicion": None       # NUEVO: Fecha de última edición
+        }
+        
+        resultado = db.mensajes.insert_one(documento_mensaje)
         
         return jsonify({
             "mensaje": "Mensaje enviado exitosamente",
-            "mensaje_id": str(resultado.inserted_id)
+            "mensaje_id": str(resultado.inserted_id),
+            "estado": "enviado",  # NUEVO
+            "timestamp": documento_mensaje["timestamp"].isoformat()
         }), 201
         
     except Exception as e:
@@ -371,21 +411,205 @@ def enviar_mensaje():
 
 @app.route('/mensajes/<canal>', methods=['GET'])
 def obtener_mensajes(canal):
-    """Obtener mensajes de canal"""
+    """Obtener mensajes de canal - MEJORADO CON ESTADOS"""
     try:
         if db is None:
             return jsonify({"error": "Base de datos no disponible"}), 500
         
+        # NUEVO: Incluir _id para permitir edición/eliminación
         mensajes = list(db.mensajes.find(
             {"canal": canal}, 
-            {"_id": 0}
+            {"_id": 1, "canal": 1, "mensaje": 1, "usuario": 1, 
+             "timestamp": 1, "estado": 1, "editado": 1, "fecha_edicion": 1}
         ).sort("timestamp", 1))
+        
+        # NUEVO: Convertir ObjectId a string y asegurar campos por defecto
+        for mensaje in mensajes:
+            mensaje["_id"] = str(mensaje["_id"])
+            mensaje["estado"] = mensaje.get("estado", "enviado")
+            mensaje["editado"] = mensaje.get("editado", False)
+            mensaje["fecha_edicion"] = mensaje.get("fecha_edicion")
         
         return jsonify({"mensajes": mensajes})
         
     except Exception as e:
         logger.error(f"Error obtener mensajes: {e}")
         return jsonify({"error": str(e)}), 500
+
+# ==================== NUEVOS ENDPOINTS PARA MENSAJES ====================
+
+@app.route('/mensaje/<mensaje_id>', methods=['PUT'])
+def editar_mensaje(mensaje_id):
+    """Editar mensaje propio - NUEVO ENDPOINT"""
+    try:
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+        
+        # Validar ObjectId
+        obj_id = validate_object_id(mensaje_id)
+        if not obj_id:
+            return jsonify({"error": "ID de mensaje inválido"}), 400
+        
+        if not request.is_json:
+            return jsonify({"error": "Content-Type debe ser application/json"}), 400
+        
+        datos = request.get_json()
+        if not datos:
+            return jsonify({"error": "No se recibieron datos"}), 400
+        
+        # Validar usuario (debe ser el autor del mensaje)
+        usuario_actual = datos.get('usuario')
+        if not usuario_actual:
+            return jsonify({"error": "Usuario requerido"}), 400
+        
+        # Buscar mensaje
+        mensaje_original = db.mensajes.find_one({"_id": obj_id})
+        if not mensaje_original:
+            return jsonify({"error": "Mensaje no encontrado"}), 404
+        
+        # Verificar que sea el autor
+        if mensaje_original.get('usuario') != usuario_actual:
+            return jsonify({"error": "Solo puedes editar tus propios mensajes"}), 403
+        
+        # Validar nuevo contenido
+        datos_mensaje, error = validate_message_data(datos)
+        if error:
+            return jsonify({"error": error}), 400
+        
+        nuevo_mensaje = datos_mensaje['mensaje']
+        
+        # No editar si el contenido es igual
+        if mensaje_original.get('mensaje') == nuevo_mensaje:
+            return jsonify({"error": "El mensaje no ha cambiado"}), 400
+        
+        # Actualizar mensaje
+        resultado = db.mensajes.update_one(
+            {"_id": obj_id},
+            {"$set": {
+                "mensaje": nuevo_mensaje,
+                "editado": True,
+                "fecha_edicion": datetime.now(),
+                "estado": "editado"  # Cambiar estado
+            }}
+        )
+        
+        if resultado.modified_count == 0:
+            return jsonify({"error": "No se pudo actualizar el mensaje"}), 500
+        
+        return jsonify({
+            "mensaje": "Mensaje editado exitosamente",
+            "mensaje_id": mensaje_id,
+            "nuevo_contenido": nuevo_mensaje,
+            "editado": True,
+            "fecha_edicion": datetime.now().isoformat()
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error editar mensaje {mensaje_id}: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+@app.route('/mensaje/<mensaje_id>', methods=['DELETE'])
+def eliminar_mensaje(mensaje_id):
+    """Eliminar mensaje propio - NUEVO ENDPOINT"""
+    try:
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+        
+        # Validar ObjectId
+        obj_id = validate_object_id(mensaje_id)
+        if not obj_id:
+            return jsonify({"error": "ID de mensaje inválido"}), 400
+        
+        # Obtener usuario del query parameter o body
+        usuario_actual = request.args.get('usuario')
+        if not usuario_actual and request.is_json:
+            datos = request.get_json()
+            usuario_actual = datos.get('usuario') if datos else None
+        
+        if not usuario_actual:
+            return jsonify({"error": "Usuario requerido"}), 400
+        
+        # Buscar mensaje
+        mensaje = db.mensajes.find_one({"_id": obj_id})
+        if not mensaje:
+            return jsonify({"error": "Mensaje no encontrado"}), 404
+        
+        # Verificar que sea el autor
+        if mensaje.get('usuario') != usuario_actual:
+            return jsonify({"error": "Solo puedes eliminar tus propios mensajes"}), 403
+        
+        # Eliminar mensaje
+        resultado = db.mensajes.delete_one({"_id": obj_id})
+        
+        if resultado.deleted_count == 0:
+            return jsonify({"error": "No se pudo eliminar el mensaje"}), 500
+        
+        return jsonify({
+            "mensaje": "Mensaje eliminado exitosamente",
+            "mensaje_id": mensaje_id,
+            "canal": mensaje.get('canal'),
+            "timestamp": datetime.now().isoformat()
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error eliminar mensaje {mensaje_id}: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+@app.route('/mensaje/<mensaje_id>/estado', methods=['PUT'])
+def actualizar_estado_mensaje(mensaje_id):
+    """Actualizar estado de mensaje (entregado, leído) - NUEVO ENDPOINT"""
+    try:
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+        
+        # Validar ObjectId
+        obj_id = validate_object_id(mensaje_id)
+        if not obj_id:
+            return jsonify({"error": "ID de mensaje inválido"}), 400
+        
+        if not request.is_json:
+            return jsonify({"error": "Content-Type debe ser application/json"}), 400
+        
+        datos = request.get_json()
+        if not datos:
+            return jsonify({"error": "No se recibieron datos"}), 400
+        
+        nuevo_estado = datos.get('estado', '').strip().lower()
+        estados_validos = ['enviado', 'entregado', 'leido', 'editado']
+        
+        if nuevo_estado not in estados_validos:
+            return jsonify({
+                "error": f"Estado inválido. Estados válidos: {', '.join(estados_validos)}"
+            }), 400
+        
+        # Buscar mensaje
+        mensaje = db.mensajes.find_one({"_id": obj_id})
+        if not mensaje:
+            return jsonify({"error": "Mensaje no encontrado"}), 404
+        
+        # Actualizar estado
+        resultado = db.mensajes.update_one(
+            {"_id": obj_id},
+            {"$set": {
+                "estado": nuevo_estado,
+                "fecha_actualizacion_estado": datetime.now()
+            }}
+        )
+        
+        if resultado.modified_count == 0:
+            return jsonify({"error": "No se pudo actualizar el estado"}), 500
+        
+        return jsonify({
+            "mensaje": "Estado actualizado exitosamente",
+            "mensaje_id": mensaje_id,
+            "estado_anterior": mensaje.get('estado', 'enviado'),
+            "estado_nuevo": nuevo_estado,
+            "timestamp": datetime.now().isoformat()
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error actualizar estado {mensaje_id}: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
 
 @app.errorhandler(404)
 def not_found(error):

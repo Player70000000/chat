@@ -2,8 +2,10 @@ services:
   - type: web
     name: chat-backend
     env: python
-    buildCommand: ""
-    startCommand: "python chat_backend.py"
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn --bind 0.0.0.0:$PORT app:app"
     envVars:
       - key: PYTHON_VERSION
         value: 3.10
+      - key: FLASK_ENV
+        value: production

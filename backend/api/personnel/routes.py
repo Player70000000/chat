@@ -307,6 +307,161 @@ def eliminar_obrero(cedula):
         return jsonify({"error": "Error interno del servidor"}), 500
 
 # =============================================================================
+# ENDPOINTS DE MODERADORES
+# =============================================================================
+
+@personnel_bp.route('/moderadores/', methods=['GET'])
+def listar_moderadores():
+    """Listar todos los moderadores"""
+    try:
+        db = get_db()
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+        
+        moderadores = list(db.personal_moderador.find({}, {"_id": 0}))
+        return jsonify({
+            "moderadores": moderadores,
+            "total": len(moderadores)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error listar moderadores: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@personnel_bp.route('/moderadores/', methods=['POST'])
+def crear_moderador():
+    """Registrar nuevo moderador"""
+    try:
+        db = get_db()
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+            
+        if not request.is_json:
+            return jsonify({"error": "Content-Type debe ser application/json"}), 400
+            
+        datos = request.get_json()
+        if not datos:
+            return jsonify({"error": "No se recibieron datos"}), 400
+        
+        # Validar datos requeridos
+        error = validate_moderador_data(datos)
+        if error:
+            return jsonify({"error": error}), 400
+        
+        # Verificar si ya existe moderador con ese correo
+        if db.personal_moderador.find_one({"correo": datos["correo"]}):
+            return jsonify({
+                "error": f"Ya existe un moderador con correo {datos['correo']}"
+            }), 400
+        
+        # Crear moderador
+        moderador_doc = {
+            "nombres": datos["nombres"],
+            "apellidos": datos["apellidos"],
+            "correo": datos["correo"],
+            "telefono": datos["telefono"],
+            "talla_ropa": datos.get("talla_ropa", ""),
+            "talla_zapatos": datos.get("talla_zapatos", ""),
+            "registrado": datetime.now(),
+            "activo": True
+        }
+        
+        resultado = db.personal_moderador.insert_one(moderador_doc)
+        
+        return jsonify({
+            "mensaje": "Moderador registrado exitosamente",
+            "moderador_id": str(resultado.inserted_id),
+            "correo": datos["correo"],
+            "nombre_completo": f"{datos['nombres']} {datos['apellidos']}",
+            "timestamp": datetime.now().isoformat()
+        }), 201
+        
+    except (WriteConcernError, OperationFailure) as e:
+        logger.error(f"Error BD crear_moderador: {e}")
+        return jsonify({"error": "Error de base de datos"}), 500
+    except Exception as e:
+        logger.error(f"Error crear_moderador: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+@personnel_bp.route('/moderadores/<correo>', methods=['GET'])
+def obtener_moderador(correo):
+    """Obtener información de un moderador por correo"""
+    try:
+        db = get_db()
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+        
+        moderador = db.personal_moderador.find_one({"correo": correo}, {"_id": 0})
+        if not moderador:
+            return jsonify({
+                "error": "Moderador no encontrado",
+                "mensaje": f"No existe moderador con correo {correo}"
+            }), 404
+        
+        return jsonify(moderador), 200
+        
+    except Exception as e:
+        logger.error(f"Error obtener moderador {correo}: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+@personnel_bp.route('/moderadores/<correo>', methods=['DELETE'])
+def eliminar_moderador(correo):
+    """Eliminar moderador"""
+    try:
+        db = get_db()
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+        
+        # Verificar existencia
+        if not db.personal_moderador.find_one({"correo": correo}):
+            return jsonify({
+                "error": "Moderador no encontrado",
+                "mensaje": f"No existe moderador con correo {correo}"
+            }), 404
+        
+        # Eliminar moderador
+        resultado = db.personal_moderador.delete_one({"correo": correo})
+        
+        if resultado.deleted_count == 0:
+            return jsonify({"error": "No se pudo eliminar el moderador"}), 500
+        
+        return jsonify({
+            "mensaje": "Moderador eliminado exitosamente",
+            "correo": correo,
+            "timestamp": datetime.now().isoformat()
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error eliminar moderador {correo}: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+def validate_moderador_data(datos):
+    """Validar datos de moderador"""
+    if not datos.get("nombres", "").strip():
+        return "Los nombres son requeridos"
+    
+    if not datos.get("apellidos", "").strip():
+        return "Los apellidos son requeridos"
+    
+    if not datos.get("correo", "").strip():
+        return "El correo es requerido"
+    
+    if not datos.get("telefono", "").strip():
+        return "El teléfono es requerido"
+    
+    # Validar formato de correo básico
+    correo = datos["correo"].strip()
+    if "@" not in correo or "." not in correo:
+        return "Formato de correo inválido"
+    
+    # Validar longitud de teléfono
+    telefono = datos["telefono"].strip()
+    if len(telefono) < 7:
+        return "Teléfono debe tener al menos 7 caracteres"
+    
+    return None
+
+# =============================================================================
 # ENDPOINTS LEGACY (Compatibilidad)
 # =============================================================================
 

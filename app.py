@@ -93,6 +93,27 @@ def api_personnel_obreros_create():
         "data": datos
     }), 201
 
+@app.route('/api/personnel/moderadores/', methods=['GET'])
+def api_personnel_moderadores():
+    """Personnel - moderators"""
+    return jsonify({
+        "success": True,
+        "moderadores": [
+            {"id": 1, "nombre": "Admin Principal", "email": "admin@empresa.com", "activo": True},
+            {"id": 2, "nombre": "Supervisor Chat", "email": "supervisor@empresa.com", "activo": True}
+        ]
+    })
+
+@app.route('/api/personnel/moderadores/', methods=['POST'])
+def api_personnel_moderadores_create():
+    """Create moderator"""
+    datos = request.get_json()
+    return jsonify({
+        "success": True,
+        "message": "Moderador registrado exitosamente",
+        "data": datos
+    }), 201
+
 @app.route('/api/reports/personal/resumen', methods=['GET'])
 def api_reports_personal():
     """Personnel reports summary"""

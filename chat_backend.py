@@ -678,14 +678,34 @@ def api_personnel_moderadores_create():
         if not datos:
             return jsonify({"error": "No se recibieron datos"}), 400
         
-        # Validar campos requeridos
-        nombre = datos.get('nombre', '').strip()
-        email = datos.get('email', '').strip()
+        # DEBUG: Log datos recibidos
+        logger.info(f"Datos recibidos para crear moderador: {datos}")
+        logger.info(f"Claves disponibles: {list(datos.keys())}")
+        
+        # Validar campos requeridos - MEJORADO para detectar diferentes nombres de campo
+        nombre = datos.get('nombre', datos.get('name', '')).strip()
+        email = datos.get('email', datos.get('correo', datos.get('mail', ''))).strip()
+        
+        logger.info(f"Nombre extraído: '{nombre}', Email extraído: '{email}'")
         
         if not nombre:
-            return jsonify({"error": "El nombre es obligatorio"}), 400
+            return jsonify({
+                "error": "El nombre es obligatorio", 
+                "debug": {
+                    "datos_recibidos": datos,
+                    "nombre_valor": nombre,
+                    "claves_disponibles": list(datos.keys())
+                }
+            }), 400
         if not email:
-            return jsonify({"error": "El email es obligatorio"}), 400
+            return jsonify({
+                "error": "El email es obligatorio",
+                "debug": {
+                    "datos_recibidos": datos,
+                    "email_valor": email,
+                    "claves_disponibles": list(datos.keys())
+                }
+            }), 400
         
         # Verificar que no exista el email
         if db.moderadores.find_one({"email": email}):

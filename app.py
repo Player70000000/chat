@@ -19,20 +19,19 @@ os.environ['FLASK_ENV'] = 'production'
 # Import existing chat backend
 from chat_backend import app, db, get_db_status
 
+# Import modern API blueprints
+from backend.api.personnel.routes import personnel_bp
+
 # Configure logging for production
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Register API blueprints
+app.register_blueprint(personnel_bp)
+
 # ==================== MODERN API ENDPOINTS ====================
 
-@app.route('/api/auth/status', methods=['GET'])
-def api_auth_status():
-    """Authentication status"""
-    return jsonify({
-        "authenticated": True,
-        "user": "sistema",
-        "timestamp": datetime.now().isoformat()
-    })
+# Auth status endpoint already exists in chat_backend.py
 
 @app.route('/api/channels/', methods=['GET'])
 def api_channels_list():
@@ -93,28 +92,7 @@ def api_personnel_obreros_create():
         "data": datos
     }), 201
 
-@app.route('/api/personnel/moderadores/', methods=['GET'])
-def api_personnel_moderadores():
-    """Personnel - moderators"""
-    logger.info("Moderadores GET endpoint called")
-    return jsonify({
-        "success": True,
-        "moderadores": [
-            {"id": 1, "nombre": "Admin Principal", "email": "admin@empresa.com", "activo": True},
-            {"id": 2, "nombre": "Supervisor Chat", "email": "supervisor@empresa.com", "activo": True}
-        ],
-        "timestamp": datetime.now().isoformat()
-    })
-
-@app.route('/api/personnel/moderadores/', methods=['POST'])
-def api_personnel_moderadores_create():
-    """Create moderator"""
-    datos = request.get_json()
-    return jsonify({
-        "success": True,
-        "message": "Moderador registrado exitosamente",
-        "data": datos
-    }), 201
+# Los endpoints de moderadores ahora se manejan por el blueprint personnel_bp
 
 @app.route('/api/reports/personal/resumen', methods=['GET'])
 def api_reports_personal():

@@ -318,7 +318,26 @@ def listar_moderadores():
         if db is None:
             return jsonify({"error": "Base de datos no disponible"}), 500
         
-        moderadores = list(db.personal_moderador.find({}, {"_id": 0}))
+        moderadores_raw = list(db.personal_moderador.find({}, {"_id": 1}))
+        
+        # Formatear moderadores para compatibilidad con frontend
+        moderadores = []
+        for mod in moderadores_raw:
+            moderador_formateado = {
+                "nombre": mod.get("nombre", ""),
+                "apellidos": mod.get("apellidos", ""),
+                "email": mod.get("email", mod.get("correo", "")),
+                "telefono": mod.get("telefono", ""),
+                "talla_ropa": mod.get("talla_ropa", ""),
+                "talla_zapatos": mod.get("talla_zapatos", ""),
+                "nivel": mod.get("nivel", "moderador"),
+                "activo": mod.get("activo", True),
+                "fecha_creacion": mod.get("fecha_creacion", mod.get("registrado", "")),
+                "creado_por": mod.get("creado_por", "sistema"),
+                "_id": str(mod["_id"])  # Incluir ID para mapeo
+            }
+            moderadores.append(moderador_formateado)
+            
         return jsonify({
             "moderadores": moderadores,
             "total": len(moderadores)
@@ -344,36 +363,52 @@ def crear_moderador():
             return jsonify({"error": "No se recibieron datos"}), 400
         
         # Validar datos requeridos
-        error = validate_moderador_data(datos)
+        error, debug_info = validate_moderador_data(datos)
         if error:
-            return jsonify({"error": error}), 400
+            response_data = {"error": error}
+            if debug_info:
+                response_data.update(debug_info)
+            return jsonify(response_data), 400
         
-        # Verificar si ya existe moderador con ese correo
-        if db.personal_moderador.find_one({"correo": datos["correo"]}):
+        # Verificar si ya existe moderador con ese email/correo
+        email = datos.get("email", datos.get("correo", ""))
+        if email and db.personal_moderador.find_one({"$or": [{"email": email}, {"correo": email}]}):
             return jsonify({
-                "error": f"Ya existe un moderador con correo {datos['correo']}"
+                "error": f"Ya existe un moderador con email {email}"
             }), 400
         
-        # Crear moderador
+        # Crear moderador - Compatible con frontend que envía email/nombre
         moderador_doc = {
-            "nombres": datos["nombres"],
-            "apellidos": datos["apellidos"],
-            "correo": datos["correo"],
-            "telefono": datos["telefono"],
+            "nombre": datos.get("nombre", datos.get("nombres", "")),
+            "apellidos": datos.get("apellidos", ""),
+            "email": datos.get("email", datos.get("correo", "")),
+            "telefono": datos.get("telefono", ""),
             "talla_ropa": datos.get("talla_ropa", ""),
             "talla_zapatos": datos.get("talla_zapatos", ""),
-            "registrado": datetime.now(),
+            "nivel": datos.get("nivel", "moderador"),
+            "creado_por": "sistema",
+            "fecha_creacion": datetime.now(),
             "activo": True
         }
         
         resultado = db.personal_moderador.insert_one(moderador_doc)
         
         return jsonify({
-            "mensaje": "Moderador registrado exitosamente",
+            "data": {
+                "nombre": moderador_doc["nombre"],
+                "email": moderador_doc["email"],
+                "apellidos": moderador_doc["apellidos"],
+                "telefono": moderador_doc["telefono"],
+                "talla_ropa": moderador_doc["talla_ropa"],
+                "talla_zapatos": moderador_doc["talla_zapatos"],
+                "nivel": moderador_doc["nivel"],
+                "activo": moderador_doc["activo"],
+                "fecha_creacion": moderador_doc["fecha_creacion"],
+                "creado_por": moderador_doc["creado_por"]
+            },
+            "message": "Moderador registrado exitosamente",
             "moderador_id": str(resultado.inserted_id),
-            "correo": datos["correo"],
-            "nombre_completo": f"{datos['nombres']} {datos['apellidos']}",
-            "timestamp": datetime.now().isoformat()
+            "success": True
         }), 201
         
     except (WriteConcernError, OperationFailure) as e:
@@ -436,30 +471,40 @@ def eliminar_moderador(correo):
         return jsonify({"error": "Error interno del servidor"}), 500
 
 def validate_moderador_data(datos):
-    """Validar datos de moderador"""
-    if not datos.get("nombres", "").strip():
-        return "Los nombres son requeridos"
+    """Validar datos de moderador - Compatible con frontend actual"""
     
-    if not datos.get("apellidos", "").strip():
-        return "Los apellidos son requeridos"
+    # Obtener nombre (puede venir como "nombre" o "nombres")
+    nombre = datos.get("nombre", datos.get("nombres", "")).strip()
+    if not nombre:
+        print(f"DEBUG validacion: nombre_original='{datos.get('nombre', '')}', nombre_despues_strip='{nombre}'")
+        return "El nombre es obligatorio", {
+            "ayuda": "Asegúrate de ingresar un nombre válido sin solo espacios",
+            "debug": {
+                "claves_disponibles": list(datos.keys()),
+                "datos_recibidos": datos,
+                "nombre_original": datos.get("nombre", ""),
+                "nombre_despues_strip": nombre
+            }
+        }
     
-    if not datos.get("correo", "").strip():
-        return "El correo es requerido"
+    # Email es requerido
+    email = datos.get("email", datos.get("correo", "")).strip()
+    if not email:
+        return "El email es obligatorio", None
     
-    if not datos.get("telefono", "").strip():
-        return "El teléfono es requerido"
+    # Validar formato de email básico
+    if "@" not in email or "." not in email:
+        return "Formato de email inválido", None
     
-    # Validar formato de correo básico
-    correo = datos["correo"].strip()
-    if "@" not in correo or "." not in correo:
-        return "Formato de correo inválido"
+    # Apellidos, telefono y tallas son opcionales pero deben ser strings
+    apellidos = datos.get("apellidos", "").strip()
+    telefono = datos.get("telefono", "").strip()
     
-    # Validar longitud de teléfono
-    telefono = datos["telefono"].strip()
-    if len(telefono) < 7:
-        return "Teléfono debe tener al menos 7 caracteres"
+    # Validar longitud de teléfono si se proporciona
+    if telefono and len(telefono) < 7:
+        return "Teléfono debe tener al menos 7 caracteres", None
     
-    return None
+    return None, None
 
 # =============================================================================
 # ENDPOINTS LEGACY (Compatibilidad)

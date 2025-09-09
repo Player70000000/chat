@@ -759,10 +759,20 @@ def api_personnel_moderadores_create():
         if db.moderadores.find_one({"email": email}):
             return jsonify({"error": f"Ya existe un moderador con el email '{email}'"}), 400
         
-        # Crear documento del moderador
+        # Obtener campos adicionales
+        apellidos = datos.get('apellidos', '').strip()
+        telefono = datos.get('telefono', '').strip()
+        talla_ropa = datos.get('talla_ropa', '').strip()
+        talla_zapatos = datos.get('talla_zapatos', '').strip()
+        
+        # Crear documento del moderador con todos los campos
         documento_moderador = {
             "nombre": nombre,
+            "apellidos": apellidos,
             "email": email,
+            "telefono": telefono,
+            "talla_ropa": talla_ropa,
+            "talla_zapatos": talla_zapatos,
             "activo": datos.get('activo', True),
             "nivel": datos.get('nivel', 'moderador'),
             "fecha_creacion": datetime.now(),
@@ -780,9 +790,15 @@ def api_personnel_moderadores_create():
             "moderador_id": str(resultado.inserted_id),
             "data": {
                 "nombre": nombre,
+                "apellidos": apellidos,
                 "email": email,
+                "telefono": telefono,
+                "talla_ropa": talla_ropa,
+                "talla_zapatos": talla_zapatos,
                 "activo": documento_moderador["activo"],
-                "nivel": documento_moderador["nivel"]
+                "nivel": documento_moderador["nivel"],
+                "fecha_creacion": documento_moderador["fecha_creacion"],
+                "creado_por": documento_moderador["creado_por"]
             }
         }), 201
         

@@ -47,6 +47,8 @@ def init_db():
             db.mensajes.create_index([("canal", 1), ("timestamp", -1)])
             # NUEVO: Índice para buscar mensajes por usuario y estado
             db.mensajes.create_index([("usuario", 1), ("_id", 1)])
+            # NUEVO: Índice para moderadores por email (único)
+            db.moderadores.create_index("email", unique=True)
         except:
             pass
             
@@ -641,26 +643,84 @@ def api_channels_list():
 
 @app.route('/api/personnel/moderadores/', methods=['GET'])
 def api_personnel_moderadores():
-    """Personnel - moderators"""
-    logger.info("Moderadores GET endpoint called")
-    return jsonify({
-        "success": True,
-        "moderadores": [
-            {"id": 1, "nombre": "Admin Principal", "email": "admin@empresa.com", "activo": True},
-            {"id": 2, "nombre": "Supervisor Chat", "email": "supervisor@empresa.com", "activo": True}
-        ],
-        "timestamp": datetime.now().isoformat()
-    })
+    """Personnel - moderators - lista desde base de datos"""
+    try:
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+        
+        # Buscar todos los moderadores en la colección
+        moderadores = list(db.moderadores.find({}, {"_id": 0}))
+        
+        logger.info(f"Moderadores encontrados: {len(moderadores)}")
+        
+        return jsonify({
+            "success": True,
+            "moderadores": moderadores,
+            "count": len(moderadores),
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error obtener moderadores: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/personnel/moderadores/', methods=['POST'])
 def api_personnel_moderadores_create():
-    """Create moderator"""
-    datos = request.get_json()
-    return jsonify({
-        "success": True,
-        "message": "Moderador registrado exitosamente",
-        "data": datos
-    }), 201
+    """Create moderator - guarda en base de datos"""
+    try:
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+            
+        if not request.is_json:
+            return jsonify({"error": "Content-Type debe ser application/json"}), 400
+            
+        datos = request.get_json()
+        if not datos:
+            return jsonify({"error": "No se recibieron datos"}), 400
+        
+        # Validar campos requeridos
+        nombre = datos.get('nombre', '').strip()
+        email = datos.get('email', '').strip()
+        
+        if not nombre:
+            return jsonify({"error": "El nombre es obligatorio"}), 400
+        if not email:
+            return jsonify({"error": "El email es obligatorio"}), 400
+        
+        # Verificar que no exista el email
+        if db.moderadores.find_one({"email": email}):
+            return jsonify({"error": f"Ya existe un moderador con el email '{email}'"}), 400
+        
+        # Crear documento del moderador
+        documento_moderador = {
+            "nombre": nombre,
+            "email": email,
+            "activo": datos.get('activo', True),
+            "nivel": datos.get('nivel', 'moderador'),
+            "fecha_creacion": datetime.now(),
+            "creado_por": "sistema"
+        }
+        
+        # Guardar en base de datos
+        resultado = db.moderadores.insert_one(documento_moderador)
+        
+        logger.info(f"Moderador creado: {nombre} ({email})")
+        
+        return jsonify({
+            "success": True,
+            "message": "Moderador registrado exitosamente",
+            "moderador_id": str(resultado.inserted_id),
+            "data": {
+                "nombre": nombre,
+                "email": email,
+                "activo": documento_moderador["activo"],
+                "nivel": documento_moderador["nivel"]
+            }
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"Error crear moderador: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
 
 @app.errorhandler(404)
 def not_found(error):

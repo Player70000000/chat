@@ -670,17 +670,39 @@ def api_personnel_moderadores_create():
     try:
         if db is None:
             return jsonify({"error": "Base de datos no disponible"}), 500
-            
+        
+        # DEBUG: Log completo del request
+        logger.info("=== MODERADOR CREATE REQUEST DEBUG ===")
+        logger.info(f"Content-Type: {request.content_type}")
+        logger.info(f"Headers: {dict(request.headers)}")
+        logger.info(f"Raw data: {request.get_data()}")
+        logger.info(f"Is JSON: {request.is_json}")
+        
         if not request.is_json:
-            return jsonify({"error": "Content-Type debe ser application/json"}), 400
+            logger.error(f"Request no es JSON. Content-Type: {request.content_type}")
+            return jsonify({
+                "error": "Content-Type debe ser application/json",
+                "debug": {
+                    "content_type_recibido": request.content_type,
+                    "headers": dict(request.headers)
+                }
+            }), 400
             
         datos = request.get_json()
         if not datos:
-            return jsonify({"error": "No se recibieron datos"}), 400
+            logger.error("No se pudieron parsear los datos JSON")
+            return jsonify({
+                "error": "No se recibieron datos o JSON inválido",
+                "debug": {
+                    "raw_data": request.get_data().decode('utf-8', errors='ignore'),
+                    "content_type": request.content_type
+                }
+            }), 400
         
         # DEBUG: Log datos recibidos
-        logger.info(f"Datos recibidos para crear moderador: {datos}")
+        logger.info(f"Datos JSON parseados: {datos}")
         logger.info(f"Claves disponibles: {list(datos.keys())}")
+        logger.info("=== FIN DEBUG REQUEST ===")
         
         # Validar campos requeridos - MEJORADO para detectar diferentes nombres de campo
         nombre = datos.get('nombre', datos.get('name', '')).strip()

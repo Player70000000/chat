@@ -689,11 +689,19 @@ def api_personnel_moderadores_create():
         logger.info(f"Nombre extraído: '{nombre}', Email extraído: '{email}'")
         
         if not nombre:
+            nombre_original = datos.get('nombre', datos.get('name', ''))
+            if nombre_original and not nombre_original.strip():
+                error_msg = "El nombre no puede estar vacío o contener solo espacios en blanco"
+            else:
+                error_msg = "El nombre es obligatorio"
+            
             return jsonify({
-                "error": "El nombre es obligatorio", 
+                "error": error_msg,
+                "ayuda": "Asegúrate de ingresar un nombre válido sin solo espacios",
                 "debug": {
                     "datos_recibidos": datos,
-                    "nombre_valor": nombre,
+                    "nombre_original": nombre_original,
+                    "nombre_despues_strip": nombre,
                     "claves_disponibles": list(datos.keys())
                 }
             }), 400

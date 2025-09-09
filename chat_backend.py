@@ -723,7 +723,7 @@ def api_personnel_moderadores_create():
         logger.info("=== FIN DEBUG REQUEST ===")
         
         # Validar campos requeridos - MEJORADO para detectar diferentes nombres de campo
-        nombre = datos.get('nombre', datos.get('name', '')).strip()
+        nombre = datos.get('nombre', datos.get('name', datos.get('nombres', ''))).strip()
         email = datos.get('email', datos.get('correo', datos.get('mail', ''))).strip()
         
         logger.info(f"Nombre extraído: '{nombre}', Email extraído: '{email}'")

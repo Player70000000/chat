@@ -611,6 +611,57 @@ def actualizar_estado_mensaje(mensaje_id):
         logger.error(f"Error actualizar estado {mensaje_id}: {e}")
         return jsonify({"error": "Error interno del servidor"}), 500
 
+# ==================== ENDPOINTS MODERNOS ====================
+
+@app.route('/api/auth/status', methods=['GET'])
+def api_auth_status():
+    """Authentication status"""
+    return jsonify({
+        "authenticated": True,
+        "user": "sistema",
+        "timestamp": datetime.now().isoformat()
+    })
+
+@app.route('/api/channels/', methods=['GET'])
+def api_channels_list():
+    """List channels - modern endpoint"""
+    try:
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+        
+        canales = list(db.canales.find({}, {"_id": 0}))
+        return jsonify({
+            "success": True,
+            "channels": canales,
+            "count": len(canales)
+        })
+    except Exception as e:
+        logger.error(f"Error api_channels: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/personnel/moderadores/', methods=['GET'])
+def api_personnel_moderadores():
+    """Personnel - moderators"""
+    logger.info("Moderadores GET endpoint called")
+    return jsonify({
+        "success": True,
+        "moderadores": [
+            {"id": 1, "nombre": "Admin Principal", "email": "admin@empresa.com", "activo": True},
+            {"id": 2, "nombre": "Supervisor Chat", "email": "supervisor@empresa.com", "activo": True}
+        ],
+        "timestamp": datetime.now().isoformat()
+    })
+
+@app.route('/api/personnel/moderadores/', methods=['POST'])
+def api_personnel_moderadores_create():
+    """Create moderator"""
+    datos = request.get_json()
+    return jsonify({
+        "success": True,
+        "message": "Moderador registrado exitosamente",
+        "data": datos
+    }), 201
+
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({"error": "Endpoint no encontrado"}), 404

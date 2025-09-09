@@ -96,12 +96,14 @@ def api_personnel_obreros_create():
 @app.route('/api/personnel/moderadores/', methods=['GET'])
 def api_personnel_moderadores():
     """Personnel - moderators"""
+    logger.info("Moderadores GET endpoint called")
     return jsonify({
         "success": True,
         "moderadores": [
             {"id": 1, "nombre": "Admin Principal", "email": "admin@empresa.com", "activo": True},
             {"id": 2, "nombre": "Supervisor Chat", "email": "supervisor@empresa.com", "activo": True}
-        ]
+        ],
+        "timestamp": datetime.now().isoformat()
     })
 
 @app.route('/api/personnel/moderadores/', methods=['POST'])

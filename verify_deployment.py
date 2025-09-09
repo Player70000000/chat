@@ -62,6 +62,7 @@ def main():
         ("GET", "/api/channels/", None, 200),
         ("GET", "/api/personnel/cuadrillas/", None, 200),
         ("GET", "/api/personnel/obreros/", None, 200),
+        ("GET", "/api/personnel/moderadores/", None, 200),
         ("GET", "/api/reports/personal/resumen", None, 200),
         ("GET", "/api/reports/chat/resumen", None, 200),
         ("GET", "/api/reports/exportar/cuadrillas", None, 200),
@@ -76,6 +77,12 @@ def main():
             "nombre": "Test",
             "apellido": "User", 
             "cedula": "12345678"
+        }, 201),
+        
+        ("POST", "/api/personnel/moderadores/", {
+            "nombre": "Test Moderador",
+            "email": "test@empresa.com",
+            "activo": True
         }, 201),
     ]
     

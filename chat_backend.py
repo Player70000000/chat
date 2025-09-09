@@ -790,6 +790,26 @@ def api_personnel_moderadores_create():
         logger.error(f"Error crear moderador: {e}")
         return jsonify({"error": "Error interno del servidor"}), 500
 
+@app.route('/api/personnel/moderadores/debug', methods=['GET', 'POST', 'PUT', 'DELETE'])
+def api_personnel_moderadores_debug():
+    """DEBUG endpoint - returns all request info"""
+    try:
+        return jsonify({
+            "method": request.method,
+            "url": request.url,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "form": dict(request.form),
+            "json": request.get_json(silent=True),
+            "data": request.get_data().decode('utf-8', errors='ignore'),
+            "content_type": request.content_type,
+            "is_json": request.is_json,
+            "content_length": request.content_length,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({"debug_error": str(e)})
+
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({"error": "Endpoint no encontrado"}), 404

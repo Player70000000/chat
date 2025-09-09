@@ -678,24 +678,42 @@ def api_personnel_moderadores_create():
         logger.info(f"Raw data: {request.get_data()}")
         logger.info(f"Is JSON: {request.is_json}")
         
-        if not request.is_json:
-            logger.error(f"Request no es JSON. Content-Type: {request.content_type}")
-            return jsonify({
-                "error": "Content-Type debe ser application/json",
-                "debug": {
-                    "content_type_recibido": request.content_type,
-                    "headers": dict(request.headers)
-                }
-            }), 400
-            
-        datos = request.get_json()
+        # Intentar obtener datos en diferentes formatos
+        datos = None
+        
+        if request.is_json:
+            datos = request.get_json()
+            logger.info("Datos recibidos como JSON")
+        elif request.form:
+            # Convertir form data a diccionario
+            datos = request.form.to_dict()
+            logger.info("Datos recibidos como form data")
+        else:
+            # Intentar parsear raw data como JSON
+            try:
+                import json
+                raw_data = request.get_data().decode('utf-8')
+                datos = json.loads(raw_data)
+                logger.info("Datos parseados desde raw data como JSON")
+            except:
+                logger.error("No se pudieron parsear los datos")
+                return jsonify({
+                    "error": "Formato de datos no soportado. Use JSON o form data.",
+                    "debug": {
+                        "content_type": request.content_type,
+                        "raw_data": request.get_data().decode('utf-8', errors='ignore')[:200],
+                        "is_json": request.is_json,
+                        "has_form": bool(request.form)
+                    }
+                }), 400
+        
         if not datos:
-            logger.error("No se pudieron parsear los datos JSON")
+            logger.error("Datos vacíos después del parsing")
             return jsonify({
-                "error": "No se recibieron datos o JSON inválido",
+                "error": "No se recibieron datos válidos",
                 "debug": {
-                    "raw_data": request.get_data().decode('utf-8', errors='ignore'),
-                    "content_type": request.content_type
+                    "content_type": request.content_type,
+                    "parsed_data": datos
                 }
             }), 400
         

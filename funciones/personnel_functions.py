@@ -273,3 +273,157 @@ def api_personnel_moderadores_debug():
         })
     except Exception as e:
         return jsonify({"debug_error": str(e)})
+
+def api_personnel_moderadores_update():
+    """Update moderator - actualiza moderador existente en base de datos"""
+    try:
+        db = get_db()
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+        
+        # DEBUG: Log completo del request
+        logger.info("=== MODERADOR UPDATE REQUEST DEBUG ===")
+        logger.info(f"Content-Type: {request.content_type}")
+        logger.info(f"Method: {request.method}")
+        logger.info(f"Raw data: {request.get_data()}")
+        
+        # Intentar obtener datos en diferentes formatos
+        datos = None
+        
+        if request.is_json:
+            datos = request.get_json()
+            logger.info("Datos recibidos como JSON")
+        elif request.form:
+            datos = request.form.to_dict()
+            logger.info("Datos recibidos como form data")
+        else:
+            try:
+                import json
+                raw_data = request.get_data().decode('utf-8')
+                datos = json.loads(raw_data)
+                logger.info("Datos parseados desde raw data como JSON")
+            except:
+                logger.error("No se pudieron parsear los datos")
+                return jsonify({
+                    "error": "Formato de datos no soportado. Use JSON o form data.",
+                    "debug": {
+                        "content_type": request.content_type,
+                        "method": request.method
+                    }
+                }), 400
+        
+        if not datos:
+            logger.error("Datos vacíos después del parsing")
+            return jsonify({"error": "No se recibieron datos válidos"}), 400
+        
+        logger.info(f"Datos recibidos para actualización: {datos}")
+        
+        # Obtener cédula del moderador a actualizar (clave primaria)
+        cedula_original = datos.get('cedula_original', datos.get('cedula', ''))
+        if not cedula_original:
+            return jsonify({"error": "Cédula original es requerida para actualizar"}), 400
+        
+        # Validar que el moderador existe
+        moderador_existente = db.moderadores.find_one({"cedula": cedula_original})
+        if not moderador_existente:
+            return jsonify({"error": f"No se encontró moderador con cédula '{cedula_original}'"}), 404
+        
+        logger.info(f"Moderador encontrado para actualizar: {moderador_existente.get('nombre')} ({moderador_existente.get('email')})")
+        
+        # Validar campos requeridos
+        nombre = datos.get('nombre', '').strip()
+        email = datos.get('email', '').strip()
+        cedula_nueva = datos.get('cedula', '').strip()
+        
+        if not nombre:
+            return jsonify({"error": "El nombre es obligatorio"}), 400
+        if not email:
+            return jsonify({"error": "El email es obligatorio"}), 400
+        
+        # Validar nueva cédula
+        cedula_valida, error_cedula = validate_cedula(cedula_nueva)
+        if error_cedula:
+            return jsonify({"error": error_cedula}), 400
+        
+        # Verificar unicidad solo si se cambió el email
+        if email != moderador_existente.get('email'):
+            if db.moderadores.find_one({"email": email, "cedula": {"$ne": cedula_original}}):
+                return jsonify({"error": f"Ya existe otro moderador con el email '{email}'"}), 400
+        
+        # Verificar unicidad solo si se cambió la cédula
+        if cedula_valida != cedula_original:
+            if db.moderadores.find_one({"cedula": cedula_valida}):
+                return jsonify({"error": f"Ya existe otro moderador con la cédula '{cedula_valida}'"}), 400
+        
+        # Verificar unicidad del teléfono solo si se cambió
+        telefono = datos.get('telefono', '').strip()
+        if telefono and telefono != moderador_existente.get('telefono'):
+            if db.moderadores.find_one({"telefono": telefono, "cedula": {"$ne": cedula_original}}):
+                return jsonify({"error": f"Ya existe otro moderador con el teléfono '{telefono}'"}), 400
+        
+        # Obtener campos adicionales
+        apellidos = datos.get('apellidos', '').strip()
+        
+        # Manejar campos opcionales
+        talla_ropa_raw = datos.get('talla_ropa')
+        talla_zapatos_raw = datos.get('talla_zapatos')
+        
+        talla_ropa_clean = (talla_ropa_raw or '').strip()
+        talla_zapatos_clean = (talla_zapatos_raw or '').strip()
+        
+        talla_ropa = talla_ropa_clean if talla_ropa_clean else "No ingresado"
+        talla_zapatos = talla_zapatos_clean if talla_zapatos_clean else "No ingresado"
+        
+        # Preparar documento actualizado
+        documento_actualizado = {
+            "nombre": nombre,
+            "apellidos": apellidos,
+            "cedula": cedula_valida,
+            "email": email,
+            "telefono": telefono,
+            "talla_ropa": talla_ropa,
+            "talla_zapatos": talla_zapatos,
+            "activo": datos.get('activo', moderador_existente.get('activo', True)),
+            "nivel": datos.get('nivel', moderador_existente.get('nivel', 'moderador')),
+            # Mantener fecha de creación original
+            "fecha_creacion": moderador_existente.get('fecha_creacion'),
+            "creado_por": moderador_existente.get('creado_por'),
+            # Agregar campos de modificación
+            "fecha_modificacion": get_venezuela_time(),
+            "modificado_por": "sistema"
+        }
+        
+        logger.info(f"Documento a actualizar: {documento_actualizado}")
+        
+        # Actualizar en base de datos
+        resultado = db.moderadores.update_one(
+            {"cedula": cedula_original},
+            {"$set": documento_actualizado}
+        )
+        
+        if resultado.modified_count == 0:
+            logger.warning("No se modificó ningún documento - posiblemente datos idénticos")
+            # Verificar si existe pero no se modificó
+            if resultado.matched_count > 0:
+                logger.info("Moderador encontrado pero sin cambios")
+            else:
+                return jsonify({"error": "No se encontró el moderador para actualizar"}), 404
+        
+        logger.info(f"Moderador actualizado exitosamente: {nombre} ({email})")
+        
+        # Obtener documento actualizado para respuesta
+        moderador_actualizado = db.moderadores.find_one({"cedula": cedula_valida}, {"_id": 0})
+        
+        return jsonify({
+            "success": True,
+            "message": "Moderador actualizado exitosamente",
+            "data": moderador_actualizado,
+            "changes": {
+                "matched_count": resultado.matched_count,
+                "modified_count": resultado.modified_count
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error actualizar moderador: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500

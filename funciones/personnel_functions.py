@@ -177,8 +177,19 @@ def api_personnel_moderadores_create():
         # NUEVO: Verificar que no exista el teléfono
         if telefono and db.moderadores.find_one({"telefono": telefono}):
             return jsonify({"error": f"Ya existe un moderador con el teléfono '{telefono}'"}), 400
-        talla_ropa = datos.get('talla_ropa', '').strip()
-        talla_zapatos = datos.get('talla_zapatos', '').strip()
+        
+        # FIX: Manejar campos opcionales que pueden ser None/null
+        talla_ropa_raw = datos.get('talla_ropa')
+        talla_zapatos_raw = datos.get('talla_zapatos')
+        
+        logger.info(f"🔍 DEBUG CAMPOS OPCIONALES: talla_ropa_raw={talla_ropa_raw} (tipo: {type(talla_ropa_raw)})")
+        logger.info(f"🔍 DEBUG CAMPOS OPCIONALES: talla_zapatos_raw={talla_zapatos_raw} (tipo: {type(talla_zapatos_raw)})")
+        
+        # Convertir None a string vacío antes de strip()
+        talla_ropa = (talla_ropa_raw or '').strip()
+        talla_zapatos = (talla_zapatos_raw or '').strip()
+        
+        logger.info(f"✅ CAMPOS OPCIONALES PROCESADOS: talla_ropa='{talla_ropa}', talla_zapatos='{talla_zapatos}'")
         
         # Crear documento del moderador con todos los campos
         documento_moderador = {

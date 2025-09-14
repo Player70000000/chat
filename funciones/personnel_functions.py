@@ -38,6 +38,33 @@ def validate_cedula(cedula):
     
     return cedula_str, None
 
+def validate_nombre_apellido(texto, campo_nombre):
+    """Validar que nombres y apellidos no contengan números"""
+    if not texto:
+        return None, f"El {campo_nombre} es obligatorio"
+    
+    # Convertir a string y limpiar espacios
+    texto_str = str(texto).strip()
+    
+    # Validar que no esté vacío después de limpiar
+    if not texto_str:
+        return None, f"El {campo_nombre} no puede estar vacío"
+    
+    # Validar que no contenga números
+    if any(char.isdigit() for char in texto_str):
+        return None, f"El {campo_nombre} no puede contener números"
+    
+    # Validar longitud mínima
+    if len(texto_str) < 2:
+        return None, f"El {campo_nombre} debe tener al menos 2 caracteres"
+    
+    # Validar longitud máxima
+    if len(texto_str) > 50:
+        return None, f"El {campo_nombre} debe tener máximo 50 caracteres"
+    
+    # Aplicar capitalización
+    return texto_str.strip().title(), None
+
 def api_personnel_moderadores():
     """Personnel - moderators - lista desde base de datos"""
     try:
@@ -119,30 +146,38 @@ def api_personnel_moderadores_create():
         logger.info(f"Claves disponibles: {list(datos.keys())}")
         logger.info("=== FIN DEBUG REQUEST ===")
         
-        # Validar y formatear campos requeridos - MEJORADO para detectar diferentes nombres de campo
-        nombre = datos.get('nombre', datos.get('name', datos.get('nombres', ''))).strip().title()  # Primera letra mayúscula
+        # Validar y formatear campos requeridos - CON VALIDACIÓN SIN NÚMEROS
+        nombre_raw = datos.get('nombre', datos.get('name', datos.get('nombres', '')))
         email = datos.get('email', datos.get('correo', datos.get('mail', ''))).strip().lower()    # Email en minúsculas
         cedula_raw = datos.get('cedula', datos.get('ci', datos.get('documento', '')))
+        apellidos_raw = datos.get('apellidos', '')
         
-        logger.info(f"Nombre extraído: '{nombre}', Email extraído: '{email}', Cédula: '{cedula_raw}'")
+        logger.info(f"Nombre extraído: '{nombre_raw}', Email extraído: '{email}', Cédula: '{cedula_raw}', Apellidos: '{apellidos_raw}'")
         
-        if not nombre:
-            nombre_original = datos.get('nombre', datos.get('name', ''))
-            if nombre_original and not nombre_original.strip():
-                error_msg = "El nombre no puede estar vacío o contener solo espacios en blanco"
-            else:
-                error_msg = "El nombre es obligatorio"
-            
+        # Validar nombre (sin números)
+        nombre, error_nombre = validate_nombre_apellido(nombre_raw, "nombre")
+        if error_nombre:
             return jsonify({
-                "error": error_msg,
-                "ayuda": "Asegúrate de ingresar un nombre válido sin solo espacios",
+                "error": error_nombre,
                 "debug": {
                     "datos_recibidos": datos,
-                    "nombre_original": nombre_original,
-                    "nombre_despues_strip": nombre,
+                    "nombre_original": nombre_raw,
                     "claves_disponibles": list(datos.keys())
                 }
             }), 400
+        
+        # Validar apellidos (sin números)
+        apellidos, error_apellidos = validate_nombre_apellido(apellidos_raw, "apellido")
+        if error_apellidos:
+            return jsonify({
+                "error": error_apellidos,
+                "debug": {
+                    "datos_recibidos": datos,
+                    "apellidos_original": apellidos_raw,
+                    "claves_disponibles": list(datos.keys())
+                }
+            }), 400
+        
         if not email:
             return jsonify({
                 "error": "El email es obligatorio",
@@ -176,8 +211,7 @@ def api_personnel_moderadores_create():
         if db.moderadores.find_one({"cedula": cedula_valida}):
             return jsonify({"error": f"Ya existe un moderador con la cédula '{cedula_valida}'"}), 400
         
-        # Obtener y formatear campos adicionales
-        apellidos = datos.get('apellidos', '').strip().title()  # Primera letra mayúscula
+        # Obtener campos adicionales
         telefono = datos.get('telefono', '').strip()
         
         # NUEVO: Verificar que no exista el teléfono
@@ -330,13 +364,22 @@ def api_personnel_moderadores_update():
         
         logger.info(f"Moderador encontrado para actualizar: {moderador_existente.get('nombre')} ({moderador_existente.get('email')})")
         
-        # Validar y formatear campos requeridos
-        nombre = datos.get('nombre', '').strip().title()  # Primera letra mayúscula
+        # Validar y formatear campos requeridos - CON VALIDACIÓN SIN NÚMEROS
+        nombre_raw = datos.get('nombre', '')
+        apellidos_raw = datos.get('apellidos', '')
         email = datos.get('email', '').strip().lower()    # Email en minúsculas
         cedula_nueva = datos.get('cedula', '').strip()
         
-        if not nombre:
-            return jsonify({"error": "El nombre es obligatorio"}), 400
+        # Validar nombre (sin números)
+        nombre, error_nombre = validate_nombre_apellido(nombre_raw, "nombre")
+        if error_nombre:
+            return jsonify({"error": error_nombre}), 400
+        
+        # Validar apellidos (sin números)
+        apellidos, error_apellidos = validate_nombre_apellido(apellidos_raw, "apellido")
+        if error_apellidos:
+            return jsonify({"error": error_apellidos}), 400
+        
         if not email:
             return jsonify({"error": "El email es obligatorio"}), 400
         
@@ -360,9 +403,6 @@ def api_personnel_moderadores_update():
         if telefono and telefono != moderador_existente.get('telefono'):
             if db.moderadores.find_one({"telefono": telefono, "cedula": {"$ne": cedula_original}}):
                 return jsonify({"error": f"Ya existe otro moderador con el teléfono '{telefono}'"}), 400
-        
-        # Obtener y formatear campos adicionales
-        apellidos = datos.get('apellidos', '').strip().title()  # Primera letra mayúscula
         
         # Manejar campos opcionales
         talla_ropa_raw = datos.get('talla_ropa')

@@ -185,9 +185,13 @@ def api_personnel_moderadores_create():
         logger.info(f"🔍 DEBUG CAMPOS OPCIONALES: talla_ropa_raw={talla_ropa_raw} (tipo: {type(talla_ropa_raw)})")
         logger.info(f"🔍 DEBUG CAMPOS OPCIONALES: talla_zapatos_raw={talla_zapatos_raw} (tipo: {type(talla_zapatos_raw)})")
         
-        # Convertir None a string vacío antes de strip()
-        talla_ropa = (talla_ropa_raw or '').strip()
-        talla_zapatos = (talla_zapatos_raw or '').strip()
+        # Convertir None a string vacío antes de strip(), luego asignar "No ingresado" si está vacío
+        talla_ropa_clean = (talla_ropa_raw or '').strip()
+        talla_zapatos_clean = (talla_zapatos_raw or '').strip()
+        
+        # Asignar "No ingresado" si los campos están vacíos
+        talla_ropa = talla_ropa_clean if talla_ropa_clean else "No ingresado"
+        talla_zapatos = talla_zapatos_clean if talla_zapatos_clean else "No ingresado"
         
         logger.info(f"✅ CAMPOS OPCIONALES PROCESADOS: talla_ropa='{talla_ropa}', talla_zapatos='{talla_zapatos}'")
         

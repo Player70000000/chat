@@ -65,6 +65,61 @@ def validate_nombre_apellido(texto, campo_nombre):
     # Aplicar capitalización
     return texto_str.strip().title(), None
 
+def validate_email(email):
+    """Validar formato de email"""
+    if not email:
+        return None, "El email es obligatorio"
+    
+    # Convertir a string y limpiar espacios
+    email_str = str(email).strip().lower()
+    
+    # Validar que no esté vacío después de limpiar
+    if not email_str:
+        return None, "El email no puede estar vacío"
+    
+    # Validar formato básico de email
+    if '@' not in email_str:
+        return None, "El email debe contener el símbolo '@' (ejemplo: usuario@gmail.com)"
+    
+    # Dividir en partes local y dominio
+    parts = email_str.split('@')
+    if len(parts) != 2:
+        return None, "El email debe tener exactamente un símbolo '@'"
+    
+    local_part, domain_part = parts
+    
+    # Validar parte local (antes del @)
+    if not local_part:
+        return None, "El email debe tener un usuario antes del '@'"
+    
+    if len(local_part) < 1:
+        return None, "La parte del usuario debe tener al menos 1 carácter"
+    
+    # Validar parte del dominio (después del @)
+    if not domain_part:
+        return None, "El email debe tener un dominio después del '@'"
+    
+    if '.' not in domain_part:
+        return None, "El dominio debe contener al menos un punto (ejemplo: @gmail.com)"
+    
+    # Validar que el dominio tenga al menos un punto y caracteres
+    domain_parts = domain_part.split('.')
+    if len(domain_parts) < 2:
+        return None, "El dominio debe tener al menos una extensión (ejemplo: .com, .es)"
+    
+    # Validar que no haya partes vacías en el dominio
+    for part in domain_parts:
+        if not part:
+            return None, "El dominio no puede tener puntos consecutivos"
+        if len(part) < 1:
+            return None, "Cada parte del dominio debe tener al menos 1 carácter"
+    
+    # Validar longitud total
+    if len(email_str) > 100:
+        return None, "El email no puede tener más de 100 caracteres"
+    
+    return email_str, None
+
 def api_personnel_moderadores():
     """Personnel - moderators - lista desde base de datos"""
     try:
@@ -146,13 +201,13 @@ def api_personnel_moderadores_create():
         logger.info(f"Claves disponibles: {list(datos.keys())}")
         logger.info("=== FIN DEBUG REQUEST ===")
         
-        # Validar y formatear campos requeridos - CON VALIDACIÓN SIN NÚMEROS
+        # Validar y formatear campos requeridos - CON VALIDACIONES COMPLETAS
         nombre_raw = datos.get('nombre', datos.get('name', datos.get('nombres', '')))
-        email = datos.get('email', datos.get('correo', datos.get('mail', ''))).strip().lower()    # Email en minúsculas
+        email_raw = datos.get('email', datos.get('correo', datos.get('mail', '')))
         cedula_raw = datos.get('cedula', datos.get('ci', datos.get('documento', '')))
         apellidos_raw = datos.get('apellidos', '')
         
-        logger.info(f"Nombre extraído: '{nombre_raw}', Email extraído: '{email}', Cédula: '{cedula_raw}', Apellidos: '{apellidos_raw}'")
+        logger.info(f"Nombre extraído: '{nombre_raw}', Email extraído: '{email_raw}', Cédula: '{cedula_raw}', Apellidos: '{apellidos_raw}'")
         
         # Validar nombre (sin números)
         nombre, error_nombre = validate_nombre_apellido(nombre_raw, "nombre")
@@ -178,12 +233,14 @@ def api_personnel_moderadores_create():
                 }
             }), 400
         
-        if not email:
+        # Validar email (formato correcto)
+        email, error_email = validate_email(email_raw)
+        if error_email:
             return jsonify({
-                "error": "El email es obligatorio",
+                "error": error_email,
                 "debug": {
                     "datos_recibidos": datos,
-                    "email_valor": email,
+                    "email_original": email_raw,
                     "claves_disponibles": list(datos.keys())
                 }
             }), 400
@@ -364,10 +421,10 @@ def api_personnel_moderadores_update():
         
         logger.info(f"Moderador encontrado para actualizar: {moderador_existente.get('nombre')} ({moderador_existente.get('email')})")
         
-        # Validar y formatear campos requeridos - CON VALIDACIÓN SIN NÚMEROS
+        # Validar y formatear campos requeridos - CON VALIDACIONES COMPLETAS
         nombre_raw = datos.get('nombre', '')
         apellidos_raw = datos.get('apellidos', '')
-        email = datos.get('email', '').strip().lower()    # Email en minúsculas
+        email_raw = datos.get('email', '')
         cedula_nueva = datos.get('cedula', '').strip()
         
         # Validar nombre (sin números)
@@ -380,8 +437,10 @@ def api_personnel_moderadores_update():
         if error_apellidos:
             return jsonify({"error": error_apellidos}), 400
         
-        if not email:
-            return jsonify({"error": "El email es obligatorio"}), 400
+        # Validar email (formato correcto)
+        email, error_email = validate_email(email_raw)
+        if error_email:
+            return jsonify({"error": error_email}), 400
         
         # Validar nueva cédula
         cedula_valida, error_cedula = validate_cedula(cedula_nueva)

@@ -119,9 +119,9 @@ def api_personnel_moderadores_create():
         logger.info(f"Claves disponibles: {list(datos.keys())}")
         logger.info("=== FIN DEBUG REQUEST ===")
         
-        # Validar campos requeridos - MEJORADO para detectar diferentes nombres de campo
-        nombre = datos.get('nombre', datos.get('name', datos.get('nombres', ''))).strip()
-        email = datos.get('email', datos.get('correo', datos.get('mail', ''))).strip()
+        # Validar y formatear campos requeridos - MEJORADO para detectar diferentes nombres de campo
+        nombre = datos.get('nombre', datos.get('name', datos.get('nombres', ''))).strip().title()  # Primera letra mayúscula
+        email = datos.get('email', datos.get('correo', datos.get('mail', ''))).strip().lower()    # Email en minúsculas
         cedula_raw = datos.get('cedula', datos.get('ci', datos.get('documento', '')))
         
         logger.info(f"Nombre extraído: '{nombre}', Email extraído: '{email}', Cédula: '{cedula_raw}'")
@@ -176,8 +176,8 @@ def api_personnel_moderadores_create():
         if db.moderadores.find_one({"cedula": cedula_valida}):
             return jsonify({"error": f"Ya existe un moderador con la cédula '{cedula_valida}'"}), 400
         
-        # Obtener campos adicionales
-        apellidos = datos.get('apellidos', '').strip()
+        # Obtener y formatear campos adicionales
+        apellidos = datos.get('apellidos', '').strip().title()  # Primera letra mayúscula
         telefono = datos.get('telefono', '').strip()
         
         # NUEVO: Verificar que no exista el teléfono
@@ -330,9 +330,9 @@ def api_personnel_moderadores_update():
         
         logger.info(f"Moderador encontrado para actualizar: {moderador_existente.get('nombre')} ({moderador_existente.get('email')})")
         
-        # Validar campos requeridos
-        nombre = datos.get('nombre', '').strip()
-        email = datos.get('email', '').strip()
+        # Validar y formatear campos requeridos
+        nombre = datos.get('nombre', '').strip().title()  # Primera letra mayúscula
+        email = datos.get('email', '').strip().lower()    # Email en minúsculas
         cedula_nueva = datos.get('cedula', '').strip()
         
         if not nombre:
@@ -361,8 +361,8 @@ def api_personnel_moderadores_update():
             if db.moderadores.find_one({"telefono": telefono, "cedula": {"$ne": cedula_original}}):
                 return jsonify({"error": f"Ya existe otro moderador con el teléfono '{telefono}'"}), 400
         
-        # Obtener campos adicionales
-        apellidos = datos.get('apellidos', '').strip()
+        # Obtener y formatear campos adicionales
+        apellidos = datos.get('apellidos', '').strip().title()  # Primera letra mayúscula
         
         # Manejar campos opcionales
         talla_ropa_raw = datos.get('talla_ropa')

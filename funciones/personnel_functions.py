@@ -173,6 +173,10 @@ def api_personnel_moderadores_create():
         # Obtener campos adicionales
         apellidos = datos.get('apellidos', '').strip()
         telefono = datos.get('telefono', '').strip()
+        
+        # NUEVO: Verificar que no exista el teléfono
+        if telefono and db.moderadores.find_one({"telefono": telefono}):
+            return jsonify({"error": f"Ya existe un moderador con el teléfono '{telefono}'"}), 400
         talla_ropa = datos.get('talla_ropa', '').strip()
         talla_zapatos = datos.get('talla_zapatos', '').strip()
         

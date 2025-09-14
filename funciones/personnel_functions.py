@@ -4,12 +4,18 @@ Maneja todas las operaciones relacionadas con moderadores y personal
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from flask import request, jsonify
 from funciones.database_functions import get_db
 
 # Logger para este módulo
 logger = logging.getLogger(__name__)
+
+def get_venezuela_time():
+    """Obtener la hora actual de Venezuela (GMT-4)"""
+    # Venezuela está en GMT-4 (4 horas atrás de UTC)
+    venezuela_tz = timezone(timedelta(hours=-4))
+    return datetime.now(venezuela_tz)
 
 def validate_cedula(cedula):
     """Validar cédula con reglas específicas"""
@@ -206,7 +212,7 @@ def api_personnel_moderadores_create():
             "talla_zapatos": talla_zapatos,
             "activo": datos.get('activo', True),
             "nivel": datos.get('nivel', 'moderador'),
-            "fecha_creacion": datetime.now(),
+            "fecha_creacion": get_venezuela_time(),
             "creado_por": "sistema"
         }
         

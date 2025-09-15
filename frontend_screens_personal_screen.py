@@ -846,10 +846,10 @@ class CuadrillasManagementScreen(MDScreen):
             print(f"Error en búsqueda de obreros: {e}")
 
     def search_obreros_by_cedula(self, cedula_partial, index):
-        """Buscar obreros en la API que coincidan con la cédula parcial"""
+        """Buscar obreros disponibles en la API que coincidan con la cédula parcial"""
         try:
-            # Llamar a la API de obreros
-            response = requests.get(f"{API_BASE_URL}/api/personnel/obreros/", timeout=5)
+            # Llamar a la API de obreros disponibles (no asignados a cuadrillas)
+            response = requests.get(f"{API_BASE_URL}/api/personnel/obreros/disponibles/", timeout=5)
 
             if response.status_code == 200:
                 data = response.json()

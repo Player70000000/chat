@@ -16,7 +16,7 @@ load_dotenv()
 from funciones.database_functions import init_db, get_db_status, get_db, get_client
 from funciones.personnel_functions import api_personnel_moderadores, api_personnel_moderadores_create, api_personnel_moderadores_update, api_personnel_moderadores_delete, api_personnel_moderadores_debug, api_personnel_obreros, api_personnel_obreros_create, api_personnel_obreros_update, api_personnel_obreros_delete, api_personnel_obreros_debug
 from funciones.cuadrilla_functions import (
-    create_cuadrilla, get_cuadrillas, get_cuadrilla_by_id, update_cuadrilla, delete_cuadrilla, get_next_cuadrilla_number_api
+    create_cuadrilla, get_cuadrillas, get_cuadrilla_by_id, update_cuadrilla, delete_cuadrilla, get_next_cuadrilla_number_api, get_obreros_disponibles
 )
 from funciones.chat_functions import (
     crear_canal, listar_canales, obtener_canal, editar_canal, eliminar_canal,
@@ -88,6 +88,7 @@ app.route('/api/personnel/cuadrillas/<cuadrilla_id>', methods=['GET'])(get_cuadr
 app.route('/api/personnel/cuadrillas/<cuadrilla_id>', methods=['PUT'])(update_cuadrilla)
 app.route('/api/personnel/cuadrillas/<cuadrilla_id>', methods=['DELETE'])(delete_cuadrilla)
 app.route('/api/personnel/cuadrillas/next-number/', methods=['GET'])(get_next_cuadrilla_number_api)
+app.route('/api/personnel/obreros/disponibles/', methods=['GET'])(get_obreros_disponibles)
 
 # ==================== ERROR HANDLERS ====================
 

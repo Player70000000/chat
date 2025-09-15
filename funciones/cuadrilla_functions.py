@@ -331,3 +331,47 @@ def get_next_cuadrilla_number_api():
     except Exception as e:
         logger.error(f"Error en API próximo número: {str(e)}")
         return jsonify({"error": "Error interno del servidor"}), 500
+
+def get_obreros_disponibles():
+    """Obtener lista de obreros que NO están asignados a cuadrillas activas"""
+    try:
+        db = get_db()
+        obreros_collection = db.obreros
+        cuadrillas_collection = db.cuadrillas
+
+        # Obtener todos los obreros
+        todos_obreros = list(obreros_collection.find())
+
+        # Obtener obreros asignados a cuadrillas activas
+        cuadrillas_activas = cuadrillas_collection.find({"activo": True})
+        obreros_asignados_ids = set()
+
+        for cuadrilla in cuadrillas_activas:
+            for obrero in cuadrilla.get("obreros", []):
+                # Usar el ObjectId del obrero asignado
+                obrero_id = obrero.get("id")
+                if obrero_id:
+                    obreros_asignados_ids.add(str(obrero_id))
+
+        # Filtrar obreros disponibles (no asignados)
+        obreros_disponibles = []
+        for obrero in todos_obreros:
+            obrero_id_str = str(obrero["_id"])
+            if obrero_id_str not in obreros_asignados_ids:
+                # Convertir ObjectId a string para JSON
+                obrero["_id"] = obrero_id_str
+                obreros_disponibles.append(obrero)
+
+        logger.info(f"Obreros disponibles: {len(obreros_disponibles)} de {len(todos_obreros)} totales")
+
+        return jsonify({
+            "success": True,
+            "obreros": obreros_disponibles,
+            "count": len(obreros_disponibles),
+            "total_obreros": len(todos_obreros),
+            "asignados": len(obreros_asignados_ids)
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error obteniendo obreros disponibles: {str(e)}")
+        return jsonify({"error": "Error interno del servidor"}), 500

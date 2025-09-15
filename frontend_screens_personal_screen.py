@@ -4,7 +4,7 @@ from kivymd.uix.label import MDLabel
 from kivymd.uix.card import MDCard
 from kivymd.uix.button import MDRaisedButton, MDIconButton
 from kivymd.uix.scrollview import MDScrollView
-from kivymd.uix.list import MDList, TwoLineListItem, OneLineListItem
+from kivymd.uix.list import MDList, TwoLineListItem, ThreeLineListItem, OneLineListItem
 from kivymd.uix.textfield import MDTextField
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.toolbar import MDTopAppBar
@@ -22,11 +22,13 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from config import API_BASE_URL
 
 
-class CuadrillaListItem(TwoLineListItem):
+class CuadrillaListItem(ThreeLineListItem):
     def __init__(self, numero_cuadrilla, moderador_nombre, numero_obreros, estado, cuadrilla_data, on_select_callback, **kwargs):
         super().__init__(**kwargs)
+        actividad = cuadrilla_data.get('actividad', 'Sin actividad')
         self.text = f"👷‍♂️ {numero_cuadrilla} - {estado}"
-        self.secondary_text = f"Moderador: {moderador_nombre} | Obreros: {numero_obreros}"
+        self.secondary_text = f"🎯 Actividad: {actividad}"
+        self.tertiary_text = f"Moderador: {moderador_nombre} | Obreros: {numero_obreros}"
         self.numero_cuadrilla = numero_cuadrilla
         self.moderador_nombre = moderador_nombre
         self.numero_obreros = numero_obreros
@@ -306,11 +308,22 @@ class CuadrillasManagementScreen(MDScreen):
         # No hay dialog de opciones que cerrar, vamos directo a detalles
 
         numero = cuadrilla_data.get('numero_cuadrilla', 'N/A')
+        actividad = cuadrilla_data.get('actividad', 'Sin actividad especificada')
         moderador = cuadrilla_data.get('moderador', {})
         obreros = cuadrilla_data.get('obreros', [])
 
         # Crear contenido detallado
         content_layout = MDBoxLayout(orientation="vertical", spacing="10dp", adaptive_height=True)
+
+        # Información de la actividad
+        actividad_info = f"🎯 Actividad:\n   {actividad}"
+
+        actividad_label = MDLabel(
+            text=actividad_info,
+            theme_text_color="Primary",
+            font_style="H6",
+            adaptive_height=True
+        )
 
         # Información del moderador
         moderador_info = f"👤 Moderador:\n"
@@ -348,6 +361,7 @@ class CuadrillasManagementScreen(MDScreen):
             adaptive_height=True
         )
 
+        content_layout.add_widget(actividad_label)
         content_layout.add_widget(moderador_label)
         content_layout.add_widget(obreros_label)
         content_layout.add_widget(meta_label)
@@ -1074,6 +1088,7 @@ class CuadrillasManagementScreen(MDScreen):
 
             # Preparar datos para enviar
             cuadrilla_data = {
+                "actividad": self.cuadrilla_actividad_field.text.strip(),
                 "moderador_id": self.selected_moderador_data['_id'],
                 "obreros_ids": obreros_ids,
                 "creado_por": "sistema"  # Aquí podrías usar el usuario actual

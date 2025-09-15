@@ -103,6 +103,10 @@ def check_obreros_disponibles(obreros_ids):
 def validate_cuadrilla_data(data):
     """Validar datos de cuadrilla antes de guardar"""
 
+    # Validar actividad
+    if not data.get("actividad") or not data.get("actividad").strip():
+        return False, "Debe especificar la actividad de la cuadrilla"
+
     # Validar moderador
     if not data.get("moderador_id"):
         return False, "Debe seleccionar un moderador"
@@ -168,6 +172,7 @@ def create_cuadrilla():
         # Crear documento de cuadrilla
         cuadrilla_doc = {
             "numero_cuadrilla": numero_cuadrilla,
+            "actividad": data["actividad"].strip(),
             "activo": True,
             "moderador": moderador_snapshot,
             "obreros": obreros_snapshots,

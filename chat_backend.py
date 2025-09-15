@@ -15,6 +15,9 @@ load_dotenv()
 # NUEVO: Importar funciones modulares
 from funciones.database_functions import init_db, get_db_status, get_db, get_client
 from funciones.personnel_functions import api_personnel_moderadores, api_personnel_moderadores_create, api_personnel_moderadores_update, api_personnel_moderadores_delete, api_personnel_moderadores_debug, api_personnel_obreros, api_personnel_obreros_create, api_personnel_obreros_update, api_personnel_obreros_delete, api_personnel_obreros_debug
+from funciones.cuadrilla_functions import (
+    create_cuadrilla, get_cuadrillas, get_cuadrilla_by_id, update_cuadrilla, delete_cuadrilla, get_next_cuadrilla_number_api
+)
 from funciones.chat_functions import (
     crear_canal, listar_canales, obtener_canal, editar_canal, eliminar_canal,
     enviar_mensaje, obtener_mensajes, editar_mensaje, eliminar_mensaje, actualizar_estado_mensaje
@@ -77,6 +80,14 @@ app.route('/api/personnel/obreros/', methods=['POST'])(api_personnel_obreros_cre
 app.route('/api/personnel/obreros/', methods=['PUT'])(api_personnel_obreros_update)
 app.route('/api/personnel/obreros/', methods=['DELETE'])(api_personnel_obreros_delete)
 app.route('/api/personnel/obreros/debug', methods=['GET', 'POST', 'PUT', 'DELETE'])(api_personnel_obreros_debug)
+
+# Cuadrillas routes - gestión de cuadrillas
+app.route('/api/personnel/cuadrillas/', methods=['GET'])(get_cuadrillas)
+app.route('/api/personnel/cuadrillas/', methods=['POST'])(create_cuadrilla)
+app.route('/api/personnel/cuadrillas/<cuadrilla_id>', methods=['GET'])(get_cuadrilla_by_id)
+app.route('/api/personnel/cuadrillas/<cuadrilla_id>', methods=['PUT'])(update_cuadrilla)
+app.route('/api/personnel/cuadrillas/<cuadrilla_id>', methods=['DELETE'])(delete_cuadrilla)
+app.route('/api/personnel/cuadrillas/next-number/', methods=['GET'])(get_next_cuadrilla_number_api)
 
 # ==================== ERROR HANDLERS ====================
 

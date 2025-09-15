@@ -128,7 +128,11 @@ def api_personnel_moderadores():
             return jsonify({"error": "Base de datos no disponible"}), 500
         
         # Buscar todos los moderadores en la colección
-        moderadores = list(db.moderadores.find({}, {"_id": 0}))
+        moderadores = list(db.moderadores.find({}))
+
+        # Convertir ObjectId a string para JSON
+        for mod in moderadores:
+            mod["_id"] = str(mod["_id"])
         
         logger.info(f"Moderadores encontrados: {len(moderadores)}")
         
@@ -643,7 +647,11 @@ def api_personnel_obreros():
             return jsonify({"error": "Base de datos no disponible"}), 500
 
         # Buscar todos los obreros en la colección
-        obreros = list(db.obreros.find({}, {"_id": 0}))
+        obreros = list(db.obreros.find({}))
+
+        # Convertir ObjectId a string para JSON
+        for obrero in obreros:
+            obrero["_id"] = str(obrero["_id"])
 
         logger.info(f"Obreros encontrados: {len(obreros)}")
 

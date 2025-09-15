@@ -14,7 +14,7 @@ load_dotenv()
 
 # NUEVO: Importar funciones modulares
 from funciones.database_functions import init_db, get_db_status, get_db, get_client
-from funciones.personnel_functions import api_personnel_moderadores, api_personnel_moderadores_create, api_personnel_moderadores_update, api_personnel_moderadores_delete, api_personnel_moderadores_debug
+from funciones.personnel_functions import api_personnel_moderadores, api_personnel_moderadores_create, api_personnel_moderadores_update, api_personnel_moderadores_delete, api_personnel_moderadores_debug, api_personnel_obreros, api_personnel_obreros_create, api_personnel_obreros_update, api_personnel_obreros_delete, api_personnel_obreros_debug
 from funciones.chat_functions import (
     crear_canal, listar_canales, obtener_canal, editar_canal, eliminar_canal,
     enviar_mensaje, obtener_mensajes, editar_mensaje, eliminar_mensaje, actualizar_estado_mensaje
@@ -70,6 +70,13 @@ app.route('/api/personnel/moderadores/', methods=['POST'])(api_personnel_moderad
 app.route('/api/personnel/moderadores/', methods=['PUT'])(api_personnel_moderadores_update)
 app.route('/api/personnel/moderadores/', methods=['DELETE'])(api_personnel_moderadores_delete)
 app.route('/api/personnel/moderadores/debug', methods=['GET', 'POST', 'PUT', 'DELETE'])(api_personnel_moderadores_debug)
+
+# Obreros routes - gestión de obreros
+app.route('/api/personnel/obreros/', methods=['GET'])(api_personnel_obreros)
+app.route('/api/personnel/obreros/', methods=['POST'])(api_personnel_obreros_create)
+app.route('/api/personnel/obreros/', methods=['PUT'])(api_personnel_obreros_update)
+app.route('/api/personnel/obreros/', methods=['DELETE'])(api_personnel_obreros_delete)
+app.route('/api/personnel/obreros/debug', methods=['GET', 'POST', 'PUT', 'DELETE'])(api_personnel_obreros_debug)
 
 # ==================== ERROR HANDLERS ====================
 

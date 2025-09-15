@@ -44,6 +44,8 @@ def init_db():
             db.mensajes.create_index([("usuario", 1), ("_id", 1)])
             # NUEVO: Índice para moderadores por email (único)
             db.moderadores.create_index("email", unique=True)
+            # NUEVO: Índice para obreros por email (único)
+            db.obreros.create_index("email", unique=True)
         except:
             pass
             

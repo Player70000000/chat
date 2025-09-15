@@ -260,20 +260,26 @@ def api_personnel_moderadores_create():
                 }
             }), 400
         
-        # Verificar que no exista el email
+        # VALIDACIÓN CRUZADA: Verificar que no exista el email en moderadores Y obreros
         if db.moderadores.find_one({"email": email}):
             return jsonify({"error": f"Ya existe un moderador con el email '{email}'"}), 400
-        
-        # Verificar que no exista la cédula
+        if db.obreros.find_one({"email": email}):
+            return jsonify({"error": f"Ya existe un obrero con el email '{email}'"}), 400
+
+        # VALIDACIÓN CRUZADA: Verificar que no exista la cédula en moderadores Y obreros
         if db.moderadores.find_one({"cedula": cedula_valida}):
             return jsonify({"error": f"Ya existe un moderador con la cédula '{cedula_valida}'"}), 400
-        
+        if db.obreros.find_one({"cedula": cedula_valida}):
+            return jsonify({"error": f"Ya existe un obrero con la cédula '{cedula_valida}'"}), 400
+
         # Obtener campos adicionales
         telefono = datos.get('telefono', '').strip()
-        
-        # NUEVO: Verificar que no exista el teléfono
+
+        # VALIDACIÓN CRUZADA: Verificar que no exista el teléfono en moderadores Y obreros
         if telefono and db.moderadores.find_one({"telefono": telefono}):
             return jsonify({"error": f"Ya existe un moderador con el teléfono '{telefono}'"}), 400
+        if telefono and db.obreros.find_one({"telefono": telefono}):
+            return jsonify({"error": f"Ya existe un obrero con el teléfono '{telefono}'"}), 400
         
         # FIX: Manejar campos opcionales que pueden ser None/null
         talla_ropa_raw = datos.get('talla_ropa')
@@ -447,21 +453,33 @@ def api_personnel_moderadores_update():
         if error_cedula:
             return jsonify({"error": error_cedula}), 400
         
-        # Verificar unicidad solo si se cambió el email
+        # VALIDACIÓN CRUZADA: Verificar unicidad solo si se cambió el email
         if email != moderador_existente.get('email'):
+            # Verificar en moderadores (excluyendo el actual)
             if db.moderadores.find_one({"email": email, "cedula": {"$ne": cedula_original}}):
                 return jsonify({"error": f"Ya existe otro moderador con el email '{email}'"}), 400
-        
-        # Verificar unicidad solo si se cambió la cédula
+            # Verificar en obreros
+            if db.obreros.find_one({"email": email}):
+                return jsonify({"error": f"Ya existe un obrero con el email '{email}'"}), 400
+
+        # VALIDACIÓN CRUZADA: Verificar unicidad solo si se cambió la cédula
         if cedula_valida != cedula_original:
+            # Verificar en moderadores
             if db.moderadores.find_one({"cedula": cedula_valida}):
                 return jsonify({"error": f"Ya existe otro moderador con la cédula '{cedula_valida}'"}), 400
-        
-        # Verificar unicidad del teléfono solo si se cambió
+            # Verificar en obreros
+            if db.obreros.find_one({"cedula": cedula_valida}):
+                return jsonify({"error": f"Ya existe un obrero con la cédula '{cedula_valida}'"}), 400
+
+        # VALIDACIÓN CRUZADA: Verificar unicidad del teléfono solo si se cambió
         telefono = datos.get('telefono', '').strip()
         if telefono and telefono != moderador_existente.get('telefono'):
+            # Verificar en moderadores (excluyendo el actual)
             if db.moderadores.find_one({"telefono": telefono, "cedula": {"$ne": cedula_original}}):
                 return jsonify({"error": f"Ya existe otro moderador con el teléfono '{telefono}'"}), 400
+            # Verificar en obreros
+            if db.obreros.find_one({"telefono": telefono}):
+                return jsonify({"error": f"Ya existe un obrero con el teléfono '{telefono}'"}), 400
         
         # Manejar campos opcionales
         talla_ropa_raw = datos.get('talla_ropa')
@@ -757,20 +775,26 @@ def api_personnel_obreros_create():
                 }
             }), 400
 
-        # Verificar que no exista el email
+        # VALIDACIÓN CRUZADA: Verificar que no exista el email en obreros Y moderadores
         if db.obreros.find_one({"email": email}):
             return jsonify({"error": f"Ya existe un obrero con el email '{email}'"}), 400
+        if db.moderadores.find_one({"email": email}):
+            return jsonify({"error": f"Ya existe un moderador con el email '{email}'"}), 400
 
-        # Verificar que no exista la cédula
+        # VALIDACIÓN CRUZADA: Verificar que no exista la cédula en obreros Y moderadores
         if db.obreros.find_one({"cedula": cedula_valida}):
             return jsonify({"error": f"Ya existe un obrero con la cédula '{cedula_valida}'"}), 400
+        if db.moderadores.find_one({"cedula": cedula_valida}):
+            return jsonify({"error": f"Ya existe un moderador con la cédula '{cedula_valida}'"}), 400
 
         # Obtener campos adicionales
         telefono = datos.get('telefono', '').strip()
 
-        # Verificar que no exista el teléfono
+        # VALIDACIÓN CRUZADA: Verificar que no exista el teléfono en obreros Y moderadores
         if telefono and db.obreros.find_one({"telefono": telefono}):
             return jsonify({"error": f"Ya existe un obrero con el teléfono '{telefono}'"}), 400
+        if telefono and db.moderadores.find_one({"telefono": telefono}):
+            return jsonify({"error": f"Ya existe un moderador con el teléfono '{telefono}'"}), 400
 
         # Manejar campos opcionales que pueden ser None/null
         talla_ropa_raw = datos.get('talla_ropa')
@@ -925,21 +949,33 @@ def api_personnel_obreros_update():
         if error_cedula:
             return jsonify({"error": error_cedula}), 400
 
-        # Verificar unicidad solo si se cambió el email
+        # VALIDACIÓN CRUZADA: Verificar unicidad solo si se cambió el email
         if email != obrero_existente.get('email'):
+            # Verificar en obreros (excluyendo el actual)
             if db.obreros.find_one({"email": email, "cedula": {"$ne": cedula_original}}):
                 return jsonify({"error": f"Ya existe otro obrero con el email '{email}'"}), 400
+            # Verificar en moderadores
+            if db.moderadores.find_one({"email": email}):
+                return jsonify({"error": f"Ya existe un moderador con el email '{email}'"}), 400
 
-        # Verificar unicidad solo si se cambió la cédula
+        # VALIDACIÓN CRUZADA: Verificar unicidad solo si se cambió la cédula
         if cedula_valida != cedula_original:
+            # Verificar en obreros
             if db.obreros.find_one({"cedula": cedula_valida}):
                 return jsonify({"error": f"Ya existe otro obrero con la cédula '{cedula_valida}'"}), 400
+            # Verificar en moderadores
+            if db.moderadores.find_one({"cedula": cedula_valida}):
+                return jsonify({"error": f"Ya existe un moderador con la cédula '{cedula_valida}'"}), 400
 
-        # Verificar unicidad del teléfono solo si se cambió
+        # VALIDACIÓN CRUZADA: Verificar unicidad del teléfono solo si se cambió
         telefono = datos.get('telefono', '').strip()
         if telefono and telefono != obrero_existente.get('telefono'):
+            # Verificar en obreros (excluyendo el actual)
             if db.obreros.find_one({"telefono": telefono, "cedula": {"$ne": cedula_original}}):
                 return jsonify({"error": f"Ya existe otro obrero con el teléfono '{telefono}'"}), 400
+            # Verificar en moderadores
+            if db.moderadores.find_one({"telefono": telefono}):
+                return jsonify({"error": f"Ya existe un moderador con el teléfono '{telefono}'"}), 400
 
         # Manejar campos opcionales
         talla_ropa_raw = datos.get('talla_ropa')

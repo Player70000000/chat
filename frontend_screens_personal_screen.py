@@ -155,7 +155,7 @@ class CuadrillasManagementScreen(MDScreen):
                             numero_obreros=num_obreros,
                             estado=estado_text,
                             cuadrilla_data=cuadrilla,
-                            on_select_callback=self.show_cuadrilla_options
+                            on_select_callback=self.view_cuadrilla_details
                         )
                         self.cuadrillas_list.add_widget(cuadrilla_item)
             else:
@@ -303,7 +303,7 @@ class CuadrillasManagementScreen(MDScreen):
 
     def view_cuadrilla_details(self, cuadrilla_data):
         """Mostrar detalles completos de la cuadrilla"""
-        self.options_dialog.dismiss()
+        # No hay dialog de opciones que cerrar, vamos directo a detalles
 
         numero = cuadrilla_data.get('numero_cuadrilla', 'N/A')
         moderador = cuadrilla_data.get('moderador', {})
@@ -357,12 +357,18 @@ class CuadrillasManagementScreen(MDScreen):
         scroll_content.add_widget(content_layout)
 
         self.details_dialog = MDDialog(
-            title=f"Detalles de {numero}",
+            title=f"👷‍♂️ {numero}",
             type="custom",
             content_cls=scroll_content,
             buttons=[
                 MDRaisedButton(
+                    text="ELIMINAR",
+                    md_bg_color=[0.8, 0.2, 0.2, 1],  # Rojo
+                    on_release=lambda x: [self.details_dialog.dismiss(), self.confirm_delete_cuadrilla(cuadrilla_data)]
+                ),
+                MDRaisedButton(
                     text="CERRAR",
+                    md_bg_color=[0.5, 0.5, 0.5, 1],  # Gris
                     on_release=lambda x: self.details_dialog.dismiss()
                 )
             ],

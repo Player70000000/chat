@@ -70,6 +70,36 @@ def get_persona_snapshot(collection_name, persona_id):
         logger.error(f"Error obteniendo snapshot de persona: {str(e)}")
         return None, f"Error interno obteniendo datos de la persona"
 
+def check_obreros_disponibles(obreros_ids):
+    """Verificar que los obreros no estén ya asignados a cuadrillas activas"""
+    try:
+        db = get_db()
+        cuadrillas_collection = db.cuadrillas
+
+        # Buscar cuadrillas activas que contengan alguno de estos obreros
+        cuadrillas_activas = cuadrillas_collection.find({"activo": True})
+
+        obreros_ya_asignados = []
+
+        for cuadrilla in cuadrillas_activas:
+            for obrero in cuadrilla.get("obreros", []):
+                obrero_id = str(obrero.get("id"))
+                if obrero_id in obreros_ids:
+                    obrero_info = f"{obrero.get('nombre')} {obrero.get('apellidos')} (CI: {obrero.get('cedula')})"
+                    cuadrilla_info = cuadrilla.get('numero_cuadrilla', 'N/A')
+                    obreros_ya_asignados.append(f"{obrero_info} en {cuadrilla_info}")
+
+        if obreros_ya_asignados:
+            error_msg = "Los siguientes obreros ya están asignados a cuadrillas activas:\n"
+            error_msg += "\n".join([f"• {info}" for info in obreros_ya_asignados])
+            return False, error_msg
+
+        return True, None
+
+    except Exception as e:
+        logger.error(f"Error verificando obreros disponibles: {str(e)}")
+        return False, "Error interno verificando disponibilidad de obreros"
+
 def validate_cuadrilla_data(data):
     """Validar datos de cuadrilla antes de guardar"""
 
@@ -97,6 +127,12 @@ def validate_cuadrilla_data(data):
     # Validar creado_por
     if not data.get("creado_por"):
         return False, "Debe especificar quién crea la cuadrilla"
+
+    # VALIDACIÓN CRÍTICA: Verificar que los obreros no estén ya asignados
+    obreros_ids = [str(oid) for oid in data.get("obreros_ids")]
+    disponibles, error_msg = check_obreros_disponibles(obreros_ids)
+    if not disponibles:
+        return False, error_msg
 
     return True, None
 

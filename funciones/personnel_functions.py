@@ -526,3 +526,91 @@ def api_personnel_moderadores_update():
     except Exception as e:
         logger.error(f"Error actualizar moderador: {e}")
         return jsonify({"error": "Error interno del servidor"}), 500
+
+def api_personnel_moderadores_delete():
+    """Delete moderator - elimina moderador existente de la base de datos"""
+    try:
+        db = get_db()
+        if db is None:
+            return jsonify({"error": "Base de datos no disponible"}), 500
+        
+        # DEBUG: Log completo del request
+        logger.info("=== MODERADOR DELETE REQUEST DEBUG ===")
+        logger.info(f"Content-Type: {request.content_type}")
+        logger.info(f"Method: {request.method}")
+        logger.info(f"Raw data: {request.get_data()}")
+        
+        # Intentar obtener datos en diferentes formatos
+        datos = None
+        
+        if request.is_json:
+            datos = request.get_json()
+            logger.info("Datos recibidos como JSON")
+        elif request.form:
+            datos = request.form.to_dict()
+            logger.info("Datos recibidos como form data")
+        else:
+            try:
+                import json
+                raw_data = request.get_data().decode('utf-8')
+                datos = json.loads(raw_data)
+                logger.info("Datos parseados desde raw data como JSON")
+            except:
+                logger.error("No se pudieron parsear los datos")
+                return jsonify({
+                    "error": "Formato de datos no soportado. Use JSON o form data.",
+                    "debug": {
+                        "content_type": request.content_type,
+                        "method": request.method
+                    }
+                }), 400
+        
+        if not datos:
+            logger.error("Datos vacíos después del parsing")
+            return jsonify({"error": "No se recibieron datos válidos"}), 400
+        
+        logger.info(f"Datos recibidos para eliminación: {datos}")
+        
+        # Obtener cédula del moderador a eliminar (clave primaria)
+        cedula = datos.get('cedula', '').strip()
+        if not cedula:
+            return jsonify({"error": "Cédula es requerida para eliminar moderador"}), 400
+        
+        # Validar que el moderador existe
+        moderador_existente = db.moderadores.find_one({"cedula": cedula})
+        if not moderador_existente:
+            return jsonify({"error": f"No se encontró moderador con cédula '{cedula}'"}), 404
+        
+        logger.info(f"Moderador encontrado para eliminar: {moderador_existente.get('nombre')} {moderador_existente.get('apellidos')} ({moderador_existente.get('email')})")
+        
+        # Guardar datos del moderador para la respuesta
+        moderador_eliminado = {
+            "nombre": moderador_existente.get('nombre'),
+            "apellidos": moderador_existente.get('apellidos'),
+            "cedula": moderador_existente.get('cedula'),
+            "email": moderador_existente.get('email'),
+            "telefono": moderador_existente.get('telefono'),
+            "fecha_creacion": moderador_existente.get('fecha_creacion'),
+            "fecha_eliminacion": get_venezuela_time(),
+            "eliminado_por": "sistema"
+        }
+        
+        # Eliminar de base de datos
+        resultado = db.moderadores.delete_one({"cedula": cedula})
+        
+        if resultado.deleted_count == 0:
+            logger.warning("No se eliminó ningún documento")
+            return jsonify({"error": "No se pudo eliminar el moderador"}), 500
+        
+        logger.info(f"Moderador eliminado exitosamente: {moderador_eliminado['nombre']} {moderador_eliminado['apellidos']}")
+        
+        return jsonify({
+            "success": True,
+            "message": "Moderador eliminado exitosamente",
+            "moderador_eliminado": moderador_eliminado,
+            "deleted_count": resultado.deleted_count
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error eliminar moderador: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500

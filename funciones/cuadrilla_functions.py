@@ -215,8 +215,8 @@ def get_cuadrillas():
         db = get_db()
         cuadrillas_collection = db.cuadrillas
 
-        # Obtener solo cuadrillas activas ordenadas por número
-        cuadrillas = list(cuadrillas_collection.find({"activo": True}).sort("numero_cuadrilla", 1))
+        # Obtener todas las cuadrillas ordenadas por número
+        cuadrillas = list(cuadrillas_collection.find().sort("numero_cuadrilla", 1))
 
         # Convertir ObjectIds a strings para JSON
         for cuadrilla in cuadrillas:
@@ -335,20 +335,11 @@ def delete_cuadrilla(cuadrilla_id):
         if not existing_cuadrilla:
             return jsonify({"error": "Cuadrilla no encontrada"}), 404
 
-        # Marcar como inactiva (soft delete)
-        result = cuadrillas_collection.update_one(
-            {"_id": ObjectId(cuadrilla_id)},
-            {
-                "$set": {
-                    "activo": False,
-                    "fecha_modificacion": get_venezuela_time(),
-                    "modificado_por": "sistema"
-                }
-            }
-        )
+        # Eliminar completamente de la base de datos (hard delete)
+        result = cuadrillas_collection.delete_one({"_id": ObjectId(cuadrilla_id)})
 
-        if result.modified_count > 0:
-            logger.info(f"Cuadrilla {cuadrilla_id} marcada como inactiva")
+        if result.deleted_count > 0:
+            logger.info(f"Cuadrilla {cuadrilla_id} eliminada completamente de la base de datos")
             return jsonify({
                 "success": True,
                 "message": "Cuadrilla eliminada exitosamente"

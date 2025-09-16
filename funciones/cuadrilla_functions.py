@@ -298,6 +298,7 @@ def update_cuadrilla(cuadrilla_id):
 
         # Preparar actualización
         update_data = {
+            "actividad": data["actividad"].strip(),
             "moderador": moderador_snapshot,
             "obreros": obreros_snapshots,
             "numero_obreros": len(obreros_snapshots),

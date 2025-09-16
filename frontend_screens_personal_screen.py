@@ -26,8 +26,8 @@ class CuadrillaListItem(ThreeLineListItem):
     def __init__(self, numero_cuadrilla, moderador_nombre, numero_obreros, estado, cuadrilla_data, on_select_callback, **kwargs):
         super().__init__(**kwargs)
         actividad = cuadrilla_data.get('actividad', 'Sin actividad')
-        self.text = f"👷‍♂️ {numero_cuadrilla} - {estado}"
-        self.secondary_text = f"🎯 Actividad: {actividad}"
+        self.text = f"{numero_cuadrilla} - {estado}"
+        self.secondary_text = f"Actividad: {actividad}"
         self.tertiary_text = f"Moderador: {moderador_nombre} | Obreros: {numero_obreros}"
         self.numero_cuadrilla = numero_cuadrilla
         self.moderador_nombre = moderador_nombre
@@ -280,7 +280,7 @@ class CuadrillasManagementScreen(MDScreen):
         info_text += "¿Qué deseas hacer?"
 
         self.options_dialog = MDDialog(
-            title=f"👷‍♂️ {numero}",
+            title=f"Opciones - {numero}",
             text=info_text,
             buttons=[
                 MDRaisedButton(
@@ -316,17 +316,17 @@ class CuadrillasManagementScreen(MDScreen):
         content_layout = MDBoxLayout(orientation="vertical", spacing="10dp", adaptive_height=True)
 
         # Información de la actividad
-        actividad_info = f"🎯 Actividad:\n   {actividad}"
+        actividad_info = f"Actividad: {actividad}"
 
         actividad_label = MDLabel(
             text=actividad_info,
             theme_text_color="Primary",
-            font_style="H6",
+            font_style="Body1",
             adaptive_height=True
         )
 
         # Información del moderador
-        moderador_info = f"👤 Moderador:\n"
+        moderador_info = f"Moderador:\n"
         moderador_info += f"   Nombre: {moderador.get('nombre', 'N/A')} {moderador.get('apellidos', 'N/A')}\n"
         moderador_info += f"   Cédula: {moderador.get('cedula', 'N/A')}"
 
@@ -337,7 +337,7 @@ class CuadrillasManagementScreen(MDScreen):
         )
 
         # Lista de obreros
-        obreros_info = f"👷‍♂️ Obreros ({len(obreros)}):\n"
+        obreros_info = f"Obreros ({len(obreros)}):\n"
         for i, obrero in enumerate(obreros, 1):
             obreros_info += f"   {i}. {obrero.get('nombre', 'N/A')} {obrero.get('apellidos', 'N/A')} (CI: {obrero.get('cedula', 'N/A')})\n"
 
@@ -351,7 +351,7 @@ class CuadrillasManagementScreen(MDScreen):
         fecha_creacion = cuadrilla_data.get('fecha_creacion', 'N/A')
         creado_por = cuadrilla_data.get('creado_por', 'N/A')
 
-        meta_info = f"📅 Información adicional:\n"
+        meta_info = f"Información adicional:\n"
         meta_info += f"   Creada: {fecha_creacion}\n"
         meta_info += f"   Creado por: {creado_por}"
 
@@ -371,7 +371,7 @@ class CuadrillasManagementScreen(MDScreen):
         scroll_content.add_widget(content_layout)
 
         self.details_dialog = MDDialog(
-            title=f"👷‍♂️ {numero}",
+            title=f"Detalles - {numero}",
             type="custom",
             content_cls=scroll_content,
             buttons=[

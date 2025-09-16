@@ -321,7 +321,7 @@ class CuadrillasManagementScreen(MDScreen):
         actividad_label = MDLabel(
             text=actividad_info,
             theme_text_color="Primary",
-            font_style="H6",
+            font_style="Body1",
             adaptive_height=True
         )
 

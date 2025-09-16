@@ -321,7 +321,7 @@ class CuadrillasManagementScreen(MDScreen):
         actividad_label = MDLabel(
             text=actividad_info,
             theme_text_color="Primary",
-            font_style="Body1",
+            font_style="H6",
             adaptive_height=True
         )
 
@@ -333,6 +333,7 @@ class CuadrillasManagementScreen(MDScreen):
         moderador_label = MDLabel(
             text=moderador_info,
             theme_text_color="Primary",
+            font_style="Body1",
             adaptive_height=True
         )
 
@@ -344,6 +345,7 @@ class CuadrillasManagementScreen(MDScreen):
         obreros_label = MDLabel(
             text=obreros_info,
             theme_text_color="Primary",
+            font_style="Body1",
             adaptive_height=True
         )
 

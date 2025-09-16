@@ -350,11 +350,14 @@ class CuadrillasManagementScreen(MDScreen):
         )
 
         # Metadatos
-        fecha_creacion = cuadrilla_data.get('fecha_creacion', 'N/A')
-        creado_por = cuadrilla_data.get('creado_por', 'N/A')
+        fecha_creacion_raw = cuadrilla_data.get('fecha_creacion', 'No especificada')
+        creado_por = cuadrilla_data.get('creado_por', 'No especificado')
+
+        # Formatear fecha en español igual que moderadores y obreros
+        fecha_creacion = self.format_date_spanish(fecha_creacion_raw)
 
         meta_info = f"Información adicional:\n"
-        meta_info += f"   Creada: {fecha_creacion}\n"
+        meta_info += f"   Creado: {fecha_creacion}\n"
         meta_info += f"   Creado por: {creado_por}"
 
         meta_label = MDLabel(

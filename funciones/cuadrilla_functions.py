@@ -215,8 +215,8 @@ def get_cuadrillas():
         db = get_db()
         cuadrillas_collection = db.cuadrillas
 
-        # Obtener todas las cuadrillas ordenadas por número
-        cuadrillas = list(cuadrillas_collection.find().sort("numero_cuadrilla", 1))
+        # Obtener solo cuadrillas activas ordenadas por número
+        cuadrillas = list(cuadrillas_collection.find({"activo": True}).sort("numero_cuadrilla", 1))
 
         # Convertir ObjectIds a strings para JSON
         for cuadrilla in cuadrillas:

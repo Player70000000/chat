@@ -70,8 +70,13 @@ def get_persona_snapshot(collection_name, persona_id):
         logger.error(f"Error obteniendo snapshot de persona: {str(e)}")
         return None, f"Error interno obteniendo datos de la persona"
 
-def check_obreros_disponibles(obreros_ids):
-    """Verificar que los obreros no estén ya asignados a cuadrillas activas"""
+def check_obreros_disponibles(obreros_ids, exclude_cuadrilla_id=None):
+    """Verificar que los obreros no estén ya asignados a cuadrillas activas
+
+    Args:
+        obreros_ids: Lista de IDs de obreros a verificar
+        exclude_cuadrilla_id: ID de cuadrilla a excluir de la verificación (para edición)
+    """
     try:
         db = get_db()
         cuadrillas_collection = db.cuadrillas
@@ -82,6 +87,12 @@ def check_obreros_disponibles(obreros_ids):
         obreros_ya_asignados = []
 
         for cuadrilla in cuadrillas_activas:
+            cuadrilla_id = str(cuadrilla.get("_id"))
+
+            # Si es la cuadrilla que estamos editando, la excluimos de la verificación
+            if exclude_cuadrilla_id and cuadrilla_id == str(exclude_cuadrilla_id):
+                continue
+
             for obrero in cuadrilla.get("obreros", []):
                 obrero_id = str(obrero.get("id"))
                 if obrero_id in obreros_ids:
@@ -100,8 +111,13 @@ def check_obreros_disponibles(obreros_ids):
         logger.error(f"Error verificando obreros disponibles: {str(e)}")
         return False, "Error interno verificando disponibilidad de obreros"
 
-def validate_cuadrilla_data(data):
-    """Validar datos de cuadrilla antes de guardar"""
+def validate_cuadrilla_data(data, exclude_cuadrilla_id=None):
+    """Validar datos de cuadrilla antes de guardar
+
+    Args:
+        data: Datos de la cuadrilla a validar
+        exclude_cuadrilla_id: ID de cuadrilla a excluir de validación (para edición)
+    """
 
     # Validar actividad
     if not data.get("actividad") or not data.get("actividad").strip():
@@ -133,8 +149,9 @@ def validate_cuadrilla_data(data):
         return False, "Debe especificar quién crea la cuadrilla"
 
     # VALIDACIÓN CRÍTICA: Verificar que los obreros no estén ya asignados
+    # En modo edición, excluir la cuadrilla actual de la verificación
     obreros_ids = [str(oid) for oid in data.get("obreros_ids")]
-    disponibles, error_msg = check_obreros_disponibles(obreros_ids)
+    disponibles, error_msg = check_obreros_disponibles(obreros_ids, exclude_cuadrilla_id)
     if not disponibles:
         return False, error_msg
 
@@ -270,8 +287,8 @@ def update_cuadrilla(cuadrilla_id):
         # Obtener datos del request
         data = request.get_json()
 
-        # Validar datos
-        is_valid, error_msg = validate_cuadrilla_data(data)
+        # Validar datos (excluyendo la cuadrilla actual para evitar conflicto)
+        is_valid, error_msg = validate_cuadrilla_data(data, exclude_cuadrilla_id=cuadrilla_id)
         if not is_valid:
             return jsonify({"error": error_msg}), 400
 

@@ -26,7 +26,8 @@ from funciones.utils_functions import (
     format_date, pagina_inicio, verificar_conexion, api_auth_status, api_channels_list
 )
 from funciones.reports_functions import (
-    generar_reporte_moderadores, listar_reportes_moderadores
+    generar_reporte_moderadores, listar_reportes_moderadores,
+    generar_reporte_obreros, listar_reportes_obreros
 )
 
 # Configuración básica de logging
@@ -96,6 +97,8 @@ app.route('/api/personnel/obreros/disponibles/', methods=['GET'])(get_obreros_di
 # Reports routes - gestión de reportes
 app.route('/api/reports/moderadores/generar', methods=['POST'])(generar_reporte_moderadores)
 app.route('/api/reports/moderadores/listar', methods=['GET'])(listar_reportes_moderadores)
+app.route('/api/reports/obreros/generar', methods=['POST'])(generar_reporte_obreros)
+app.route('/api/reports/obreros/listar', methods=['GET'])(listar_reportes_obreros)
 
 # ==================== ERROR HANDLERS ====================
 

@@ -25,12 +25,15 @@ from funciones.chat_functions import (
 from funciones.utils_functions import (
     format_date, pagina_inicio, verificar_conexion, api_auth_status, api_channels_list
 )
+from funciones.reports_functions import (
+    generar_reporte_moderadores, listar_reportes_moderadores
+)
 
 # Configuración básica de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 CORS(app)
 
 # NUEVO: Obtener referencias de BD desde el módulo
@@ -89,6 +92,10 @@ app.route('/api/personnel/cuadrillas/<cuadrilla_id>', methods=['PUT'])(update_cu
 app.route('/api/personnel/cuadrillas/<cuadrilla_id>', methods=['DELETE'])(delete_cuadrilla)
 app.route('/api/personnel/cuadrillas/next-number/', methods=['GET'])(get_next_cuadrilla_number_api)
 app.route('/api/personnel/obreros/disponibles/', methods=['GET'])(get_obreros_disponibles)
+
+# Reports routes - gestión de reportes
+app.route('/api/reports/moderadores/generar', methods=['POST'])(generar_reporte_moderadores)
+app.route('/api/reports/moderadores/listar', methods=['GET'])(listar_reportes_moderadores)
 
 # ==================== ERROR HANDLERS ====================
 

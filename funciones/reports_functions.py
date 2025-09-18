@@ -663,13 +663,12 @@ def generar_reporte_general(reporte_data):
         fecha_actual = datetime.now()
         fecha_str = fecha_actual.strftime("%Y%m%d_%H%M%S")
 
-        # Crear directorio si no existe
-        reportes_dir = "/tmp/static/reportes"
-        os.makedirs(reportes_dir, exist_ok=True)
-
-        # Nombre del archivo
+        # 3. Generar PDF
         pdf_filename = f"reporte_general_N{numero_reporte}_{fecha_str}.pdf"
-        pdf_path = os.path.join(reportes_dir, pdf_filename)
+        pdf_path = os.path.join("static", "reportes", pdf_filename)
+
+        # Crear directorio si no existe
+        os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
 
         # 4. Generar archivo (PDF o texto según disponibilidad)
         archivo_creado = False

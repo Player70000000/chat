@@ -415,27 +415,55 @@ class ReportesGeneralesManager:
                 numero = cuadrilla.get('numero_cuadrilla', 'N/A')
                 menu_items.append({
                     "text": numero,
-                    "on_release": lambda x=None, cuad=cuadrilla: self._on_cuadrilla_selected(cuad)
+                    "on_release": lambda x=None, cuad=cuadrilla, menu=None: self._on_cuadrilla_selected_with_close(cuad, menu)
                 })
 
             print(f"📝 Items del dropdown: {len(menu_items)}")
 
             # Crear y mostrar dropdown
-            dropdown_menu = MDDropdownMenu(
+            self.cuadrilla_dropdown = MDDropdownMenu(
                 caller=instance,
                 items=menu_items,
-                width_mult=3,
+                width_mult=2,  # Reducir ancho para que no se salga
                 max_height="200dp",
-                position="bottom"
+                position="auto"  # Posición automática mejor
             )
-            dropdown_menu.open()
+
+            # Actualizar referencias del menu en los items
+            for i, item in enumerate(menu_items):
+                item["on_release"] = lambda x=None, cuad=self.cuadrillas_data[i]: self._on_cuadrilla_selected_with_close(cuad, self.cuadrilla_dropdown)
+
+            self.cuadrilla_dropdown.open()
         else:
             print(f"❌ Aún no hay cuadrillas después de recargar")
             self._mostrar_error_dialog("Error cargando cuadrillas. Verifica tu conexión.")
 
 
+    def _on_cuadrilla_selected_with_close(self, cuadrilla_data, dropdown_menu):
+        """Callback cuando se selecciona una cuadrilla del dropdown con cierre automático"""
+        print(f"✅ Cuadrilla seleccionada: {cuadrilla_data.get('numero_cuadrilla', 'N/A')}")
+
+        # Cerrar dropdown primero
+        if dropdown_menu:
+            dropdown_menu.dismiss()
+
+        numero = cuadrilla_data.get('numero_cuadrilla', 'N/A')
+        actividad = cuadrilla_data.get('actividad', 'Sin actividad')
+
+        # Guardar data de cuadrilla seleccionada
+        self.selected_cuadrilla_data = cuadrilla_data
+
+        # Actualizar botón de cuadrilla
+        self.cuadrilla_field.text = f"Cuadrilla: {numero}"
+
+        # Actualizar campo de actividad
+        self.actividad_field.text = actividad
+
+        # Limpiar herramientas para nuevas
+        self._actualizar_herramientas_perdidas_dañadas()
+
     def _on_cuadrilla_selected(self, cuadrilla_data):
-        """Callback cuando se selecciona una cuadrilla del dropdown"""
+        """Callback cuando se selecciona una cuadrilla del dropdown (legacy)"""
         numero = cuadrilla_data.get('numero_cuadrilla', 'N/A')
         actividad = cuadrilla_data.get('actividad', 'Sin actividad')
 

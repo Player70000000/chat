@@ -774,7 +774,7 @@ def listar_reportes_generales():
                 "actividad": reporte["actividad"],
                 "municipio": reporte["municipio"],
                 "total_herramientas": reporte.get("resumen", {}).get("total_herramientas", 0),
-                "pdf_url": f"/static/reportes/{reporte[\"pdf_filename\"]}",
+                "pdf_url": f"/static/reportes/{reporte['pdf_filename']}",
                 "estado": reporte.get("estado", "generado")
             })
 
@@ -805,10 +805,10 @@ def _crear_texto_simulado_general(txt_path, reporte_data, numero_reporte, fecha_
             # Información básica
             f.write("INFORMACIÓN DEL TRABAJO:\n")
             f.write("-" * 30 + "\n")
-            f.write(f"Cuadrilla: {reporte_data.get(\"cuadrilla\", \"N/A\")}\n")
-            f.write(f"Actividad: {reporte_data.get(\"actividad\", \"N/A\")}\n")
-            f.write(f"Municipio: {reporte_data.get(\"municipio\", \"N/A\")}\n")
-            f.write(f"Distancia recorrida: {reporte_data.get(\"distancia_metros\", 0)} metros\n\n")
+            f.write(f"Cuadrilla: {reporte_data.get('cuadrilla', 'N/A')}\n")
+            f.write(f"Actividad: {reporte_data.get('actividad', 'N/A')}\n")
+            f.write(f"Municipio: {reporte_data.get('municipio', 'N/A')}\n")
+            f.write(f"Distancia recorrida: {reporte_data.get('distancia_metros', 0)} metros\n\n")
 
             # Herramientas utilizadas
             herramientas = reporte_data.get("herramientas", [])
@@ -816,10 +816,10 @@ def _crear_texto_simulado_general(txt_path, reporte_data, numero_reporte, fecha_
             f.write("-" * 30 + "\n")
 
             for i, herramienta in enumerate(herramientas, 1):
-                f.write(f"{i}. {herramienta.get(\"nombre\", \"Sin nombre\")}\n")
-                f.write(f"   Cantidad utilizada: {herramienta.get(\"cantidad_utilizada\", 0)}\n")
-                f.write(f"   Perdidas: {herramienta.get(\"perdidas\", 0)}\n")
-                f.write(f"   Dañadas: {herramienta.get(\"dañadas\", 0)}\n\n")
+                f.write(f"{i}. {herramienta.get('nombre', 'Sin nombre')}\n")
+                f.write(f"   Cantidad utilizada: {herramienta.get('cantidad_utilizada', 0)}\n")
+                f.write(f"   Perdidas: {herramienta.get('perdidas', 0)}\n")
+                f.write(f"   Dañadas: {herramienta.get('dañadas', 0)}\n\n")
 
             # Resumen de herramientas
             total_utilizadas = sum(h.get("cantidad_utilizada", 0) for h in herramientas)
@@ -909,10 +909,10 @@ def _crear_pdf_general(pdf_path, reporte_data, numero_reporte, fecha_creacion):
         # Información básica del trabajo
         story.append(Paragraph("INFORMACIÓN DEL TRABAJO:", subtitle_style))
         info_trabajo = [
-            f"Cuadrilla: {reporte_data.get(\"cuadrilla\", \"N/A\")}",
-            f"Actividad: {reporte_data.get(\"actividad\", \"N/A\")}",
-            f"Municipio: {reporte_data.get(\"municipio\", \"N/A\")}",
-            f"Distancia recorrida: {reporte_data.get(\"distancia_metros\", 0)} metros"
+            f"Cuadrilla: {reporte_data.get('cuadrilla', 'N/A')}",
+            f"Actividad: {reporte_data.get('actividad', 'N/A')}",
+            f"Municipio: {reporte_data.get('municipio', 'N/A')}",
+            f"Distancia recorrida: {reporte_data.get('distancia_metros', 0)} metros"
         ]
 
         for info in info_trabajo:
@@ -924,10 +924,10 @@ def _crear_pdf_general(pdf_path, reporte_data, numero_reporte, fecha_creacion):
         story.append(Paragraph("HERRAMIENTAS UTILIZADAS:", subtitle_style))
 
         for i, herramienta in enumerate(herramientas, 1):
-            story.append(Paragraph(f"{i}. {herramienta.get(\"nombre\", \"Sin nombre\")}", normal_style))
-            story.append(Paragraph(f"   Cantidad utilizada: {herramienta.get(\"cantidad_utilizada\", 0)}", normal_style))
-            story.append(Paragraph(f"   Perdidas: {herramienta.get(\"perdidas\", 0)}", normal_style))
-            story.append(Paragraph(f"   Dañadas: {herramienta.get(\"dañadas\", 0)}", normal_style))
+            story.append(Paragraph(f"{i}. {herramienta.get('nombre', 'Sin nombre')}", normal_style))
+            story.append(Paragraph(f"   Cantidad utilizada: {herramienta.get('cantidad_utilizada', 0)}", normal_style))
+            story.append(Paragraph(f"   Perdidas: {herramienta.get('perdidas', 0)}", normal_style))
+            story.append(Paragraph(f"   Dañadas: {herramienta.get('dañadas', 0)}", normal_style))
             story.append(Spacer(1, 6))
 
         # Resumen de herramientas

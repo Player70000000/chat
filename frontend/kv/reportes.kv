@@ -1,0 +1,57 @@
+#:kivy 1.11.0
+
+<ReportCard@MDCard>:
+    orientation: "vertical"
+    size_hint_y: None
+    height: "140dp"
+    padding: "16dp"
+    spacing: "12dp"
+    elevation: 2
+    
+    MDBoxLayout:
+        orientation: "horizontal"
+        adaptive_height: True
+        spacing: "12dp"
+        
+        MDIcon:
+            id: report_icon
+            theme_icon_color: "Primary"
+            size_hint_x: None
+            width: "48dp"
+            
+        MDBoxLayout:
+            orientation: "vertical"
+            spacing: "4dp"
+            
+            MDLabel:
+                id: title_label
+                font_style: "H6"
+                theme_text_color: "Primary"
+                size_hint_y: None
+                height: self.texture_size[1]
+                
+            MDLabel:
+                id: description_label
+                font_style: "Body2"
+                theme_text_color: "Secondary"
+                text_size: self.width, None
+                size_hint_y: None
+                height: self.texture_size[1]
+                
+    MDBoxLayout:
+        orientation: "horizontal"
+        adaptive_height: True
+        spacing: "8dp"
+        
+        MDChip:
+            id: status_chip
+            size_hint_x: None
+            width: self.texture_size[0] + dp(24)
+            
+        MDLabel:
+            id: date_label
+            font_style: "Caption"
+            theme_text_color: "Hint"
+            size_hint_y: None
+            height: self.texture_size[1]
+            halign: "right"

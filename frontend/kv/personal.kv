@@ -1,0 +1,67 @@
+#:kivy 1.11.0
+
+<CuadrillaCard@MDCard>:
+    orientation: "vertical"
+    size_hint_y: None
+    height: "120dp"
+    padding: "16dp"
+    spacing: "8dp"
+    elevation: 2
+    
+    MDBoxLayout:
+        orientation: "horizontal"
+        adaptive_height: True
+        
+        MDIcon:
+            icon: "account-group"
+            theme_icon_color: "Primary"
+            size_hint_x: None
+            width: "40dp"
+            
+        MDLabel:
+            id: name_label
+            font_style: "H6"
+            theme_text_color: "Primary"
+            
+    MDLabel:
+        id: description_label
+        font_style: "Body2"
+        theme_text_color: "Secondary"
+        text_size: self.width, None
+        size_hint_y: None
+        height: self.texture_size[1]
+        
+<EmpleadoCard@MDCard>:
+    orientation: "vertical"
+    size_hint_y: None
+    height: "100dp"
+    padding: "16dp"
+    spacing: "8dp"
+    elevation: 2
+    
+    MDBoxLayout:
+        orientation: "horizontal"
+        adaptive_height: True
+        
+        MDIcon:
+            icon: "account"
+            theme_icon_color: "Primary"
+            size_hint_x: None
+            width: "40dp"
+            
+        MDBoxLayout:
+            orientation: "vertical"
+            
+            MDLabel:
+                id: name_label
+                font_style: "Subtitle1"
+                theme_text_color: "Primary"
+                size_hint_y: None
+                height: self.texture_size[1]
+                
+            MDLabel:
+                id: cuadrilla_label
+                font_style: "Caption"
+                theme_text_color: "Secondary"
+                size_hint_y: None
+                height: self.texture_size[1]

@@ -14,7 +14,7 @@ from kivymd.uix.widget import MDWidget
 from kivymd.uix.menu import MDDropdownMenu
 from kivy.clock import Clock
 from kivy.metrics import dp
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import sys
 import os
@@ -183,7 +183,24 @@ class CuadrillasManagementScreen(MDScreen):
             on_release=lambda x: self.load_cuadrillas()
         )
         self.cuadrillas_list.add_widget(retry_item)
-        
+
+    def capitalize_first_letter(self, text_field, text):
+        """Capitalizar automáticamente la primera letra del texto"""
+        # Evitar recursión infinita
+        if hasattr(text_field, '_capitalizing') and text_field._capitalizing:
+            return
+
+        if text and len(text) > 0:
+            # Capitalizar primera letra
+            capitalized_text = text[0].upper() + text[1:] if len(text) > 1 else text[0].upper()
+
+            # Solo actualizar si hay cambio para evitar loop infinito
+            if text != capitalized_text:
+                # Marcar que estamos capitalizando para evitar recursión
+                text_field._capitalizing = True
+                text_field.text = capitalized_text
+                text_field._capitalizing = False
+
     def show_create_cuadrilla_dialog(self):
         content = MDBoxLayout(orientation="vertical", spacing="15dp", size_hint_y=None, height="200dp")
         
@@ -210,6 +227,8 @@ class CuadrillasManagementScreen(MDScreen):
             height="48dp",
             helper_text="Ej: Limpieza general, Mantenimiento"
         )
+        # Capitalizar automáticamente la primera letra
+        self.actividad_input.bind(text=lambda instance, text: self.capitalize_first_letter(instance, text))
         
         content.add_widget(title_label)
         content.add_widget(self.numero_input)
@@ -312,43 +331,6 @@ class CuadrillasManagementScreen(MDScreen):
         moderador = cuadrilla_data.get('moderador', {})
         obreros = cuadrilla_data.get('obreros', [])
 
-        # Crear contenido detallado
-        content_layout = MDBoxLayout(orientation="vertical", spacing="10dp", adaptive_height=True)
-
-        # Información de la actividad
-        actividad_info = f"Actividad: {actividad}"
-
-        actividad_label = MDLabel(
-            text=actividad_info,
-            theme_text_color="Primary",
-            font_style="Body1",
-            adaptive_height=True
-        )
-
-        # Información del moderador
-        moderador_info = f"Moderador:\n"
-        moderador_info += f"   Nombre: {moderador.get('nombre', 'N/A')} {moderador.get('apellidos', 'N/A')}\n"
-        moderador_info += f"   Cédula: {moderador.get('cedula', 'N/A')}"
-
-        moderador_label = MDLabel(
-            text=moderador_info,
-            theme_text_color="Primary",
-            font_style="Body1",
-            adaptive_height=True
-        )
-
-        # Lista de obreros
-        obreros_info = f"Obreros ({len(obreros)}):\n"
-        for i, obrero in enumerate(obreros, 1):
-            obreros_info += f"   {i}. {obrero.get('nombre', 'N/A')} {obrero.get('apellidos', 'N/A')} (CI: {obrero.get('cedula', 'N/A')})\n"
-
-        obreros_label = MDLabel(
-            text=obreros_info,
-            theme_text_color="Primary",
-            font_style="Body1",
-            adaptive_height=True
-        )
-
         # Metadatos
         fecha_creacion_raw = cuadrilla_data.get('fecha_creacion', 'No especificada')
         creado_por = cuadrilla_data.get('creado_por', 'No especificado')
@@ -356,44 +338,734 @@ class CuadrillasManagementScreen(MDScreen):
         # Formatear fecha en español igual que moderadores y obreros
         fecha_creacion = self.format_date_spanish(fecha_creacion_raw)
 
-        meta_info = f"Información adicional:\n"
-        meta_info += f"   Creado: {fecha_creacion}\n"
-        meta_info += f"   Creado por: {creado_por}"
+        # Crear texto de detalles completo
+        detalles = f"Actividad: {actividad}\n\n"
 
-        meta_label = MDLabel(
-            text=meta_info,
-            theme_text_color="Secondary",
-            adaptive_height=True
+        # Información del moderador
+        detalles += f"Moderador:\n"
+        detalles += f"   Nombre: {moderador.get('nombre', 'N/A')} {moderador.get('apellidos', 'N/A')}\n"
+        detalles += f"   Cédula: {moderador.get('cedula', 'N/A')}\n\n"
+
+        # Lista de obreros
+        detalles += f"Obreros ({len(obreros)}):\n"
+        for i, obrero in enumerate(obreros, 1):
+            detalles += f"   {i}. {obrero.get('nombre', 'N/A')} {obrero.get('apellidos', 'N/A')} (CI: {obrero.get('cedula', 'N/A')})\n"
+
+        # Información adicional
+        detalles += f"\nInformación adicional:\n"
+        detalles += f"   Creado: {fecha_creacion}\n"
+        detalles += f"   Creado por: {creado_por}"
+
+        # Crear diálogo personalizado con botón de eliminar igual que moderadores
+        self.show_cuadrilla_details_dialog(cuadrilla_data, detalles, numero)
+
+    def show_cuadrilla_details_dialog(self, cuadrilla_data, detalles_text, numero):
+        """Mostrar diálogo de detalles con botón de eliminar igual que moderadores"""
+        from kivymd.uix.boxlayout import MDBoxLayout
+        from kivymd.uix.button import MDIconButton
+        from kivymd.uix.label import MDLabel
+
+        # Crear contenedor principal que incluye el título personalizado
+        main_content = MDBoxLayout(
+            orientation="vertical",
+            spacing="8dp",
+            size_hint_y=None,
+            padding=["0dp", "0dp", "0dp", "0dp"]  # Sin padding superior
+        )
+        main_content.bind(minimum_height=main_content.setter('height'))
+
+        # Crear header personalizado con título y botón de eliminar
+        header_layout = MDBoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height="60dp",  # Más alto para mejor alineación
+            spacing="5dp",
+            padding=["8dp", "8dp", "8dp", "8dp"]  # Padding uniforme
         )
 
-        content_layout.add_widget(actividad_label)
-        content_layout.add_widget(moderador_label)
-        content_layout.add_widget(obreros_label)
-        content_layout.add_widget(meta_label)
+        # Título del diálogo
+        title_label = MDLabel(
+            text=f"Detalles - {numero}",
+            theme_text_color="Primary",
+            font_style="H6",
+            size_hint_x=0.8,
+            halign="left",
+            valign="center",
+            text_size=(None, None)
+        )
+
+        # Botón de editar
+        edit_button = MDIconButton(
+            icon="pencil",
+            theme_icon_color="Primary",
+            size_hint=(None, None),
+            size=("28dp", "28dp"),
+            pos_hint={"center_y": 0.5, "right": 1},
+            on_release=lambda x: self.edit_cuadrilla_from_details(cuadrilla_data)
+        )
+
+        # Agregar título y botón al header
+        header_layout.add_widget(title_label)
+        header_layout.add_widget(edit_button)
+
+        # Contenido de detalles
+        details_label = MDLabel(
+            text=detalles_text,
+            theme_text_color="Primary",
+            size_hint_y=None,
+            halign="left",
+            valign="top"
+        )
+        details_label.bind(texture_size=details_label.setter('size'))
+
+        # Agregar header y contenido al contenedor principal
+        main_content.add_widget(header_layout)
+        main_content.add_widget(details_label)
+
+        # Espaciador entre texto y botones
+        spacer_vertical = MDWidget(size_hint_y=None, height="15dp")
+        main_content.add_widget(spacer_vertical)
+
+        # Crear layout personalizado para botones separados
+        buttons_layout = MDBoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height="50dp",
+            spacing="10dp",
+            padding="10dp"
+        )
+
+        # Botón eliminar a la IZQUIERDA
+        delete_button = MDIconButton(
+            icon="delete",
+            md_bg_color=[0.8, 0.2, 0.2, 1],  # Rojo para indicar peligro
+            icon_color=[1, 1, 1, 1],  # Ícono blanco
+            size_hint=(None, None),
+            size=("40dp", "40dp"),
+            on_release=lambda x: self.delete_cuadrilla_confirmation(cuadrilla_data)
+        )
+
+        # Espaciador que se expande para separar los botones
+        spacer = MDWidget(size_hint=(1, 1))
+
+        # Botón cerrar a la DERECHA
+        close_button = MDRaisedButton(
+            text="Cerrar",
+            md_bg_color=[0.5, 0.5, 0.5, 1],  # Color gris
+            size_hint=(None, None),
+            width="80dp",
+            height="36dp",
+            on_release=lambda x: self.details_dialog.dismiss()
+        )
+
+        # Agregar botones al layout
+        buttons_layout.add_widget(delete_button)
+        buttons_layout.add_widget(spacer)
+        buttons_layout.add_widget(close_button)
+
+        # Agregar layout de botones al contenido principal
+        main_content.add_widget(buttons_layout)
 
         # Crear scroll para el contenido
         scroll_content = MDScrollView(size_hint_y=None, height="400dp")
-        scroll_content.add_widget(content_layout)
+        scroll_content.add_widget(main_content)
 
+        # Crear diálogo SIN título (ya lo tenemos en el header personalizado)
         self.details_dialog = MDDialog(
-            title=f"Detalles - {numero}",
             type="custom",
             content_cls=scroll_content,
+            size_hint=(0.9, 0.8),
+            auto_dismiss=True  # Permitir cerrar al hacer clic fuera
+        )
+        self.details_dialog.open()
+
+    def edit_cuadrilla_from_details(self, cuadrilla_data):
+        """Editar cuadrilla completa desde detalles"""
+        print(f"✏️ Editando cuadrilla: {cuadrilla_data.get('numero_cuadrilla', 'Sin número')}")
+
+        # Cerrar diálogo actual
+        if hasattr(self, 'details_dialog'):
+            self.details_dialog.dismiss()
+
+        # Mostrar formulario de edición completo
+        self.show_edit_cuadrilla_dialog(cuadrilla_data)
+
+    def show_edit_cuadrilla_dialog(self, cuadrilla_data):
+        """Editar cuadrilla - NUEVA VERSIÓN DESDE CERO"""
+        try:
+            print("🆕 Creando dialog de edición desde cero...")
+
+            # Extraer datos
+            cuadrilla_id = cuadrilla_data.get('_id')
+            numero_cuadrilla = cuadrilla_data.get('numero_cuadrilla', 'N/A')
+            actividad_actual = cuadrilla_data.get('actividad', '')
+            moderador_actual = cuadrilla_data.get('moderador', {})
+            obreros_actuales = cuadrilla_data.get('obreros', [])
+
+            # Guardar datos para posterior uso
+            self.edit_obreros_data = []
+            for obrero in obreros_actuales:
+                self.edit_obreros_data.append({
+                    'id': str(obrero.get('id', '')),
+                    'nombre': obrero.get('nombre', ''),
+                    'apellidos': obrero.get('apellidos', ''),
+                    'cedula': obrero.get('cedula', '')
+                })
+
+            self.edit_moderador_id = str(moderador_actual.get('id', ''))
+            self.edit_moderador_data = moderador_actual
+
+            # Crear CONTENIDO SIMPLE usando scroll (que funciona bien)
+            scroll = MDScrollView()
+
+            content = MDBoxLayout(
+                orientation="vertical",
+                spacing="15dp",
+                adaptive_height=True,
+                padding="20dp"
+            )
+
+            # Campo Actividad
+            self.edit_actividad_field = MDTextField(
+                text=actividad_actual,
+                hint_text="Actividad de la cuadrilla",
+                size_hint_y=None,
+                height="60dp"
+            )
+            content.add_widget(self.edit_actividad_field)
+
+            # Botón Moderador
+            moderador_nombre = f"{moderador_actual.get('nombre', '')} {moderador_actual.get('apellidos', '')}"
+            self.edit_moderador_button = MDRaisedButton(
+                text=f"Moderador: {moderador_nombre}",
+                size_hint_y=None,
+                height="50dp",
+                on_release=lambda x: self.select_moderador_for_edit()
+            )
+            content.add_widget(self.edit_moderador_button)
+
+            # Sección Obreros
+            titulo_obreros = MDLabel(
+                text=f"Obreros de la cuadrilla ({len(obreros_actuales)}):",
+                theme_text_color="Primary",
+                font_style="Subtitle1",
+                size_hint_y=None,
+                height="30dp"
+            )
+            content.add_widget(titulo_obreros)
+
+            # Lista de obreros
+            for i, obrero in enumerate(obreros_actuales, 1):
+                # Título del obrero
+                obrero_titulo = MDLabel(
+                    text=f"Obrero {i}:",
+                    theme_text_color="Secondary",
+                    size_hint_y=None,
+                    height="25dp"
+                )
+                content.add_widget(obrero_titulo)
+
+                # Campo del obrero
+                obrero_texto = f"CI: {obrero.get('cedula', '')} | {obrero.get('nombre', '')} {obrero.get('apellidos', '')}"
+                obrero_field = MDTextField(
+                    text=obrero_texto,
+                    readonly=True,
+                    size_hint_y=None,
+                    height="50dp"
+                )
+                content.add_widget(obrero_field)
+
+            # Agregar contenido al scroll
+            scroll.add_widget(content)
+
+            # Crear dialog con título normal
+            self.edit_cuadrilla_dialog = MDDialog(
+                title=f"Editar {numero_cuadrilla}",
+                type="custom",
+                content_cls=scroll,
+                buttons=[
+                    MDRaisedButton(
+                        text="CANCELAR",
+                        on_release=lambda x: self.edit_cuadrilla_dialog.dismiss()
+                    ),
+                    MDRaisedButton(
+                        text="GUARDAR",
+                        md_bg_color=[0.2, 0.7, 0.3, 1],
+                        on_release=lambda x: self.save_simple_cuadrilla_changes(cuadrilla_id)
+                    )
+                ]
+            )
+
+            self.edit_cuadrilla_dialog.open()
+            print("✅ Dialog creado desde cero")
+
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            self.show_dialog("Error", str(e))
+
+    def save_simple_cuadrilla_changes(self, cuadrilla_id):
+        """Guardar cambios simples de cuadrilla (actividad y moderador)"""
+        try:
+            # Validar campos
+            actividad = self.edit_actividad_field.text.strip()
+            if not actividad:
+                self.show_dialog("Error", "La actividad es obligatoria")
+                return
+
+            if not self.edit_moderador_id:
+                self.show_dialog("Error", "Debe tener un moderador asignado")
+                return
+
+            # Preparar datos (mantener obreros actuales)
+            data = {
+                "actividad": actividad,
+                "moderador_id": self.edit_moderador_id,
+                "obreros_ids": [obrero['id'] for obrero in self.edit_obreros_data],
+                "creado_por": "usuario"
+            }
+
+            print(f"DEBUG: Guardando cambios simples: {data}")
+
+            # Enviar al backend
+            response = requests.put(
+                f"{API_BASE_URL}/api/personnel/cuadrillas/{cuadrilla_id}",
+                json=data,
+                timeout=10
+            )
+
+            if response.status_code == 200:
+                self.edit_cuadrilla_dialog.dismiss()
+                self.show_dialog("¡Éxito!", "Cuadrilla actualizada exitosamente")
+                self.load_cuadrillas()
+            else:
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get('error', 'Error desconocido')
+                    print(f"ERROR del servidor: {error_msg}")
+                    self.show_dialog("Error del servidor", f"No se pudo actualizar:\n{error_msg}")
+                except:
+                    self.show_dialog("Error", f"Error del servidor: {response.status_code}")
+
+        except requests.exceptions.Timeout:
+            self.show_dialog("Error", "El servidor tardó demasiado en responder")
+        except requests.exceptions.ConnectionError:
+            self.show_dialog("Error", "No se pudo conectar al servidor")
+        except Exception as e:
+            print(f"Error guardando cambios: {e}")
+            self.show_dialog("Error", f"Error inesperado: {str(e)}")
+
+    def select_moderador_for_edit(self):
+        """Seleccionar nuevo moderador para edición"""
+        # Cargar moderadores desde API
+        try:
+            response = requests.get(f"{API_BASE_URL}/api/personnel/moderadores/", timeout=5)
+
+            if response.status_code == 200:
+                data = response.json()
+                moderadores = data.get('moderadores', [])
+
+                if not moderadores:
+                    self.show_dialog("Sin Moderadores", "No hay moderadores registrados para seleccionar.")
+                    return
+
+                # Crear items del menú
+                menu_items = []
+                for moderador in moderadores:
+                    nombre = moderador.get('nombre', '')
+                    apellidos = moderador.get('apellidos', '')
+                    cedula = moderador.get('cedula', '')
+                    nombre_completo = f"{nombre} {apellidos} (CI: {cedula})"
+
+                    menu_items.append({
+                        "text": f"   {nombre_completo}   ",
+                        "viewclass": "OneLineListItem",
+                        "height": 50,
+                        "on_release": lambda x=moderador: self.select_moderador_for_edit_action(x),
+                    })
+
+                self.moderador_edit_dropdown = MDDropdownMenu(
+                    caller=self.edit_moderador_button,
+                    items=menu_items,
+                    width_mult=4,
+                    max_height=300,
+                    position="bottom",
+                )
+
+                self.moderador_edit_dropdown.open()
+
+            else:
+                self.show_dialog("Error", "No se pudo cargar la lista de moderadores.")
+
+        except Exception as e:
+            print(f"Error al cargar moderadores: {e}")
+            self.show_dialog("Error", "Error al conectar con el servidor.")
+
+    def select_moderador_for_edit_action(self, moderador_data):
+        """Acción al seleccionar un moderador para edición"""
+        try:
+            # Cerrar dropdown
+            if hasattr(self, 'moderador_edit_dropdown'):
+                self.moderador_edit_dropdown.dismiss()
+
+            # Actualizar datos del moderador seleccionado
+            self.edit_moderador_id = moderador_data.get('_id')
+            self.edit_moderador_data = moderador_data
+
+            # Actualizar texto del botón con información del moderador seleccionado
+            nombre = moderador_data.get('nombre', '')
+            apellidos = moderador_data.get('apellidos', '')
+            cedula = moderador_data.get('cedula', '')
+
+            if hasattr(self, 'edit_moderador_button'):
+                self.edit_moderador_button.text = f"{nombre} {apellidos} (CI: {cedula})"
+
+            print(f"✅ Moderador seleccionado: {nombre} {apellidos}")
+
+        except Exception as e:
+            print(f"Error seleccionando moderador: {e}")
+            self.show_dialog("Error", "Error al seleccionar moderador.")
+
+    def add_obrero_to_edit(self):
+        """Agregar nuevo obrero a la cuadrilla"""
+        # Verificar límite máximo
+        if len(self.edit_obreros_data) >= 40:
+            self.show_dialog("Límite Alcanzado", "Una cuadrilla no puede tener más de 40 obreros.")
+            return
+
+        # Crear dialog para agregar obrero
+        from kivymd.uix.boxlayout import MDBoxLayout
+        from kivymd.uix.textfield import MDTextField
+        from kivymd.uix.label import MDLabel
+
+        content_layout = MDBoxLayout(orientation="vertical", spacing="15dp", size_hint_y=None, height="120dp")
+
+        title_label = MDLabel(
+            text="Agregar Obrero a la Cuadrilla",
+            theme_text_color="Primary",
+            font_style="Subtitle1",
+            size_hint_y=None,
+            height="30dp",
+            halign="center"
+        )
+
+        # Campo de búsqueda por cédula
+        self.add_obrero_cedula_field = MDTextField(
+            hint_text="Ingrese cédula del obrero",
+            helper_text="Búsqueda inteligente por cédula",
+            helper_text_mode="on_focus",
+            size_hint_y=None,
+            height="48dp",
+            input_filter="int",
+            max_text_length=10
+        )
+
+        # Bind para búsqueda inteligente
+        self.add_obrero_cedula_field.bind(text=self.on_add_obrero_cedula_change)
+
+        # Label para mostrar resultados
+        self.add_obrero_result_label = MDLabel(
+            text="",
+            size_hint_y=None,
+            height="30dp",
+            theme_text_color="Secondary",
+            halign="center"
+        )
+
+        content_layout.add_widget(title_label)
+        content_layout.add_widget(self.add_obrero_cedula_field)
+        content_layout.add_widget(self.add_obrero_result_label)
+
+        # Variables para guardar obrero encontrado
+        self.add_obrero_found_data = None
+
+        self.add_obrero_dialog = MDDialog(
+            title="Agregar Obrero",
+            type="custom",
+            content_cls=content_layout,
             buttons=[
+                MDRaisedButton(
+                    text="CANCELAR",
+                    md_bg_color=[0.5, 0.5, 0.5, 1],
+                    on_release=lambda x: self.add_obrero_dialog.dismiss()
+                ),
+                MDRaisedButton(
+                    text="AGREGAR",
+                    md_bg_color=[0.2, 0.7, 0.3, 1],  # Verde
+                    on_release=self.confirm_add_obrero_to_edit
+                )
+            ]
+        )
+
+        self.add_obrero_dialog.open()
+
+    def on_add_obrero_cedula_change(self, instance, text):
+        """Búsqueda inteligente de obreros por cédula para agregar a cuadrilla"""
+        if len(text) < 2:
+            self.add_obrero_result_label.text = ""
+            self.add_obrero_found_data = None
+            return
+
+        try:
+            # Obtener obreros disponibles (no asignados a cuadrillas actualmente)
+            response = requests.get(f"{API_BASE_URL}/api/personnel/obreros/disponibles/", timeout=5)
+
+            if response.status_code == 200:
+                data = response.json()
+                obreros = data.get('obreros', [])
+
+                # Buscar obreros que empiecen con la cédula ingresada
+                matches = []
+                for obrero in obreros:
+                    cedula = obrero.get('cedula', '')
+                    if cedula.startswith(text):
+                        # Verificar que no esté ya en la cuadrilla actual
+                        already_in_cuadrilla = any(
+                            o.get('cedula') == cedula for o in self.edit_obreros_data
+                        )
+                        if not already_in_cuadrilla:
+                            matches.append(obrero)
+
+                if matches:
+                    if len(matches) == 1:
+                        # Un solo resultado, mostrar datos
+                        obrero = matches[0]
+                        nombre = obrero.get('nombre', '')
+                        apellidos = obrero.get('apellidos', '')
+                        cedula = obrero.get('cedula', '')
+
+                        self.add_obrero_result_label.text = f"✅ {nombre} {apellidos} (CI: {cedula})"
+                        self.add_obrero_result_label.theme_text_color = "Primary"
+                        self.add_obrero_found_data = obrero
+                    else:
+                        # Múltiples resultados
+                        self.add_obrero_result_label.text = f"🔍 {len(matches)} obreros encontrados - sea más específico"
+                        self.add_obrero_result_label.theme_text_color = "Secondary"
+                        self.add_obrero_found_data = None
+                else:
+                    # Sin resultados
+                    self.add_obrero_result_label.text = "❌ Sin obreros disponibles con esa cédula"
+                    self.add_obrero_result_label.theme_text_color = "Error"
+                    self.add_obrero_found_data = None
+
+            else:
+                self.add_obrero_result_label.text = "❌ Error al buscar obreros"
+                self.add_obrero_result_label.theme_text_color = "Error"
+                self.add_obrero_found_data = None
+
+        except Exception as e:
+            print(f"Error buscando obrero: {e}")
+            self.add_obrero_result_label.text = "❌ Error de conexión"
+            self.add_obrero_result_label.theme_text_color = "Error"
+            self.add_obrero_found_data = None
+
+    def confirm_add_obrero_to_edit(self, instance):
+        """Confirmar y agregar obrero a la cuadrilla en edición"""
+        if not self.add_obrero_found_data:
+            self.show_dialog("Error", "Debe seleccionar un obrero válido primero.")
+            return
+
+        try:
+            # Agregar obrero a la lista de edición
+            new_obrero = {
+                'id': self.add_obrero_found_data.get('_id'),
+                'nombre': self.add_obrero_found_data.get('nombre', ''),
+                'apellidos': self.add_obrero_found_data.get('apellidos', ''),
+                'cedula': self.add_obrero_found_data.get('cedula', ''),
+                'email': self.add_obrero_found_data.get('email', ''),
+                'telefono': self.add_obrero_found_data.get('telefono', '')
+            }
+
+            self.edit_obreros_data.append(new_obrero)
+
+            # Actualizar la lista visual de obreros
+            self.update_edit_obreros_list()
+
+            # Cerrar dialog
+            self.add_obrero_dialog.dismiss()
+
+            # Mensaje de éxito
+            nombre_completo = f"{new_obrero['nombre']} {new_obrero['apellidos']}"
+            self.show_dialog("¡Éxito!", f"Obrero {nombre_completo} agregado a la cuadrilla.")
+
+            print(f"✅ Obrero agregado: {nombre_completo}. Total obreros: {len(self.edit_obreros_data)}")
+
+        except Exception as e:
+            print(f"Error agregando obrero: {e}")
+            self.show_dialog("Error", "Error al agregar obrero.")
+
+    def update_edit_obreros_list(self):
+        """Actualizar la lista visual de obreros en el dialog de edición"""
+        try:
+            if hasattr(self, 'edit_obreros_container') and self.edit_obreros_container:
+                # Limpiar contenedor
+                self.edit_obreros_container.clear_widgets()
+
+                # Agregar obreros actualizados
+                for i, obrero in enumerate(self.edit_obreros_data, 1):
+                    from kivymd.uix.list import ThreeLineListItem
+                    from kivymd.uix.button import MDIconButton
+
+                    # Crear item de lista con botón de eliminar
+                    obrero_item = ThreeLineListItem(
+                        text=f"{i}. {obrero.get('nombre', '')} {obrero.get('apellidos', '')}",
+                        secondary_text=f"CI: {obrero.get('cedula', 'N/A')}",
+                        tertiary_text=f"Tel: {obrero.get('telefono', 'N/A')}",
+                        on_release=lambda x, obrero_data=obrero: self.remove_obrero_from_edit(obrero_data)
+                    )
+
+                    self.edit_obreros_container.add_widget(obrero_item)
+
+                # Actualizar contador
+                if hasattr(self, 'edit_obreros_count_label'):
+                    self.edit_obreros_count_label.text = f"Obreros asignados: {len(self.edit_obreros_data)} (Mínimo: 4, Máximo: 40)"
+
+        except Exception as e:
+            print(f"Error actualizando lista de obreros: {e}")
+
+    def delete_cuadrilla_confirmation(self, cuadrilla_data):
+        """Función llamada cuando se presiona el botón de eliminar - PASO 2: Primer confirmación"""
+        print(f"🗑️ Iniciando eliminación de cuadrilla: {cuadrilla_data.get('numero_cuadrilla', 'Sin número')}")
+
+        # Cerrar dialog de detalles primero
+        if hasattr(self, 'details_dialog'):
+            self.details_dialog.dismiss()
+
+        # Obtener datos de la cuadrilla para el mensaje
+        numero = cuadrilla_data.get('numero_cuadrilla', '')
+        actividad = cuadrilla_data.get('actividad', '')
+        num_obreros = cuadrilla_data.get('numero_obreros', 0)
+
+        # Mensaje de confirmación personalizado
+        mensaje_confirmacion = f"¿Seguro desea eliminar la cuadrilla:\n\n{numero}\nActividad: {actividad}\nObreros: {num_obreros}"
+
+        print(f"📋 Mostrando primer mensaje de confirmación para: {numero}")
+
+        # Crear primer dialog de confirmación
+        self.first_delete_dialog = MDDialog(
+            title="Confirmar Eliminación",
+            text=mensaje_confirmacion,
+            buttons=[
+                MDRaisedButton(
+                    text="CANCELAR",
+                    md_bg_color=[0.5, 0.5, 0.5, 1],  # Gris
+                    on_release=lambda x: self.cancel_delete_cuadrilla()
+                ),
                 MDRaisedButton(
                     text="ELIMINAR",
                     md_bg_color=[0.8, 0.2, 0.2, 1],  # Rojo
-                    on_release=lambda x: [self.details_dialog.dismiss(), self.confirm_delete_cuadrilla(cuadrilla_data)]
+                    on_release=lambda x: self.show_second_delete_confirmation_cuadrilla(cuadrilla_data)
+                )
+            ]
+        )
+        self.first_delete_dialog.open()
+
+    def cancel_delete_cuadrilla(self):
+        """Cancelar eliminación de cuadrilla y volver a lista"""
+        print("❌ Eliminación cancelada por el usuario")
+
+        # Cerrar dialog de confirmación
+        if hasattr(self, 'first_delete_dialog'):
+            self.first_delete_dialog.dismiss()
+        if hasattr(self, 'second_delete_dialog'):
+            self.second_delete_dialog.dismiss()
+
+        print("🔙 Permaneciendo en la lista de cuadrillas")
+        # Ya estamos en la lista de cuadrillas, no necesitamos navegar
+
+    def show_second_delete_confirmation_cuadrilla(self, cuadrilla_data):
+        """Mostrar segundo mensaje de confirmación - PASO 3: Confirmación irreversible"""
+        print(f"⚠️ Mostrando segunda confirmación para: {cuadrilla_data.get('numero_cuadrilla', '')}")
+
+        # Cerrar primer dialog
+        if hasattr(self, 'first_delete_dialog'):
+            self.first_delete_dialog.dismiss()
+
+        # Obtener datos para mensaje más específico
+        numero = cuadrilla_data.get('numero_cuadrilla', '')
+
+        # Segundo mensaje más severo
+        mensaje_final = f"⚠️ ADVERTENCIA CRÍTICA ⚠️\n\nEsta acción es IRREVERSIBLE.\n\nSe eliminará definitivamente:\n{numero}\n\n¿Confirmar eliminación?"
+
+        # Crear segundo dialog con advertencia más severa
+        self.second_delete_dialog = MDDialog(
+            title="🚨 CONFIRMACIÓN FINAL",
+            text=mensaje_final,
+            buttons=[
+                MDRaisedButton(
+                    text="CANCELAR",
+                    md_bg_color=[0.5, 0.5, 0.5, 1],  # Gris
+                    on_release=lambda x: self.cancel_delete_cuadrilla()
                 ),
                 MDRaisedButton(
-                    text="CERRAR",
-                    md_bg_color=[0.5, 0.5, 0.5, 1],  # Gris
-                    on_release=lambda x: self.details_dialog.dismiss()
+                    text="CONFIRMAR",
+                    md_bg_color=[0.9, 0.1, 0.1, 1],  # Rojo más intenso
+                    on_release=lambda x: self.execute_delete_cuadrilla(cuadrilla_data)
                 )
-            ],
-            size_hint=(0.9, 0.8)
+            ]
         )
-        self.details_dialog.open()
+        self.second_delete_dialog.open()
+
+    def execute_delete_cuadrilla(self, cuadrilla_data):
+        """Ejecutar eliminación definitiva de la cuadrilla - PASOS 5-7"""
+        print(f"💀 Ejecutando eliminación definitiva de: {cuadrilla_data.get('numero_cuadrilla', '')}")
+
+        # Cerrar segundo dialog
+        if hasattr(self, 'second_delete_dialog'):
+            self.second_delete_dialog.dismiss()
+
+        try:
+            # PASO 5: Obtener ID de la cuadrilla
+            cuadrilla_id = cuadrilla_data.get('_id')
+            if not cuadrilla_id:
+                print("❌ Error: No se encontró el ID de la cuadrilla")
+                self.show_dialog("Error", "No se pudo identificar la cuadrilla a eliminar")
+                return
+
+            print(f"🌐 Enviando petición DELETE a: /api/personnel/cuadrillas/{cuadrilla_id}")
+
+            # PASO 6: Enviar petición DELETE al servidor
+            response = requests.delete(
+                f"{API_BASE_URL}/api/personnel/cuadrillas/{cuadrilla_id}",
+                timeout=10
+            )
+
+            print(f"📡 Respuesta del servidor: {response.status_code}")
+
+            if response.status_code == 200:
+                # PASO 7: Eliminación exitosa - actualizar interfaz
+                print("✅ Cuadrilla eliminada exitosamente")
+
+                data = response.json()
+                message = data.get('message', 'Cuadrilla eliminada exitosamente')
+
+                # Mostrar mensaje de éxito y recargar lista
+                self.show_dialog("Éxito", message)
+
+                # Recargar lista de cuadrillas para reflejar cambios
+                self.load_cuadrillas()
+
+            else:
+                # Error del servidor
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get('error', 'Error desconocido del servidor')
+                except:
+                    error_msg = f"Error HTTP {response.status_code}"
+
+                print(f"❌ Error del servidor: {error_msg}")
+                self.show_dialog("Error del Servidor", f"No se pudo eliminar la cuadrilla:\n{error_msg}")
+
+        except requests.exceptions.Timeout:
+            print("⏰ Timeout en petición de eliminación")
+            self.show_dialog("Error de Conexión", "La petición tardó demasiado. Verifique su conexión.")
+
+        except requests.exceptions.ConnectionError:
+            print("🌐 Error de conexión")
+            self.show_dialog("Error de Conexión", "No se pudo conectar al servidor. Verifique su conexión.")
+
+        except Exception as e:
+            print(f"💥 Error inesperado: {str(e)}")
+            self.show_dialog("Error Inesperado", f"Error interno:\n{str(e)}")
 
     def edit_cuadrilla(self, numero, actividad_actual):
         self.options_dialog.dismiss()
@@ -415,6 +1087,8 @@ class CuadrillasManagementScreen(MDScreen):
             size_hint_y=None,
             height="48dp"
         )
+        # Capitalizar automáticamente la primera letra
+        self.edit_actividad_input.bind(text=lambda instance, text: self.capitalize_first_letter(instance, text))
         
         content.add_widget(info_label)
         content.add_widget(self.edit_actividad_input)
@@ -556,6 +1230,8 @@ class CuadrillasManagementScreen(MDScreen):
             size_hint_y=None,
             height="60dp"
         )
+        # Capitalizar automáticamente la primera letra
+        self.cuadrilla_actividad_field.bind(text=lambda instance, text: self.capitalize_first_letter(instance, text))
 
         # Campo Moderador Asignado (obligatorio) - BOTÓN SELECTOR
         self.cuadrilla_moderador_field = MDRaisedButton(
@@ -948,14 +1624,24 @@ class CuadrillasManagementScreen(MDScreen):
             # Obtener el campo de búsqueda como caller
             caller = self.campos_obreros[index]['busqueda_field']
 
-            # Crear dropdown con nombre único por campo
+            # Crear dropdown con nombre único por campo y scroll mejorado
             dropdown_name = f"obreros_dropdown_{index}"
+
+            # Calcular altura dinámica basada en número de items
+            item_height = 50  # Altura de cada item
+            padding = 20      # Padding adicional
+            min_height = 100  # Altura mínima
+            max_height = 300  # Altura máxima para permitir scroll
+
+            calculated_height = len(menu_items) * item_height + padding
+            dropdown_height = max(min_height, min(calculated_height, max_height))
+
             dropdown = MDDropdownMenu(
                 caller=caller,
                 items=menu_items,
                 width_mult=4,
-                max_height=200,
-                position="bottom",
+                max_height=dropdown_height,
+                position="bottom"
             )
 
             # Guardar referencia al dropdown en el campo
@@ -1157,6 +1843,67 @@ class CuadrillasManagementScreen(MDScreen):
             ]
         )
         dialog.open()
+
+    def format_date_spanish(self, fecha_raw):
+        """Formatear fecha en español con formato Dom, 14/07/2025 13:20:32"""
+        if not fecha_raw or fecha_raw == 'No especificada':
+            return 'No especificada'
+
+        try:
+            # Diccionario de días en español
+            dias_espanol = {
+                'Monday': 'Lun',
+                'Tuesday': 'Mar',
+                'Wednesday': 'Mié',
+                'Thursday': 'Jue',
+                'Friday': 'Vie',
+                'Saturday': 'Sáb',
+                'Sunday': 'Dom'
+            }
+
+            # Si fecha_raw es un diccionario (respuesta de MongoDB), extraer el timestamp
+            if isinstance(fecha_raw, dict) and '$date' in fecha_raw:
+                timestamp = fecha_raw['$date']
+                if isinstance(timestamp, (int, float)):
+                    # Timestamp en milisegundos, convertir a segundos
+                    fecha = datetime.fromtimestamp(timestamp / 1000)
+                else:
+                    # Probablemente string ISO
+                    fecha = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            elif isinstance(fecha_raw, str):
+                # Intentar parsear diferentes formatos de string
+                try:
+                    # Formato GMT: "Sun, 14 Sep 2025 17:20:32 GMT"
+                    if fecha_raw.endswith(' GMT'):
+                        from datetime import datetime, timedelta, timedelta
+                        fecha_utc = datetime.strptime(fecha_raw, "%a, %d %b %Y %H:%M:%S GMT")
+                        # Convertir de UTC a hora de Venezuela (UTC-4)
+                        fecha = fecha_utc - timedelta(hours=4)
+                    # ISO format with Z
+                    elif 'T' in fecha_raw and fecha_raw.endswith('Z'):
+                        fecha = datetime.fromisoformat(fecha_raw.replace('Z', '+00:00'))
+                    # ISO format standard
+                    elif 'T' in fecha_raw:
+                        fecha = datetime.fromisoformat(fecha_raw)
+                    else:
+                        # Fallback genérico
+                        fecha = datetime.fromisoformat(fecha_raw)
+                except:
+                    return fecha_raw  # Si no se puede parsear, devolver como está
+            else:
+                # Si es datetime object directamente
+                fecha = fecha_raw
+
+            # Formatear en español: Dom, 14/07/2025 13:20:32
+            dia_ingles = fecha.strftime('%A')
+            dia_espanol = dias_espanol.get(dia_ingles, dia_ingles[:3])
+            fecha_formateada = fecha.strftime(f"{dia_espanol}, %d/%m/%Y %H:%M:%S")
+
+            return fecha_formateada
+
+        except Exception as e:
+            print(f"Error formateando fecha: {e}, fecha_raw: {fecha_raw}")
+            return str(fecha_raw)  # En caso de error, devolver como string
 
 
 class EmpleadosManagementScreen(MDScreen):
@@ -3228,7 +3975,7 @@ class PersonalScreen(MDBoxLayout):
                 try:
                     # Formato GMT: "Sun, 14 Sep 2025 17:20:32 GMT"
                     if fecha_raw.endswith(' GMT'):
-                        from datetime import datetime, timedelta
+                        from datetime import datetime, timedelta, timedelta
                         fecha_utc = datetime.strptime(fecha_raw, "%a, %d %b %Y %H:%M:%S GMT")
                         # Convertir de UTC a hora de Venezuela (UTC-4)
                         fecha = fecha_utc - timedelta(hours=4)

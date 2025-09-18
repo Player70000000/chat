@@ -318,32 +318,69 @@ curl -X POST "https://chat-cv1i.onrender.com/api/personnel/obreros/" \
    - ✅ Usar: `git reset --soft [COMMIT_ANTERIOR]`
    - ✅ Evitar: Agregar CLAUDE.md con tokens
 
+## 🏗️ **NUEVA ARQUITECTURA FRONTEND v6.0 - SISTEMA MODULAR**
+
+### **🔥 ACTUALIZACIÓN CRÍTICA: MODULARIZACIÓN COMPLETA**
+- **Problema Resuelto**: Dialog de edición de cuadrillas con layout roto
+- **Arquitectura**: Sistema modular vs archivo monolítico (5,116 líneas)
+- **Separación**: 8 módulos especializados + coordinador principal
+- **Mantenibilidad**: 94% reducción en archivo principal
+
+### **📂 Nueva Estructura Frontend**
+```
+/produccion/frontend/screens/
+├── personal_screen.py              # 🎯 COORDINADOR (322 líneas)
+└── personal_modules/               # 📂 MÓDULOS ESPECIALIZADOS
+    ├── cuadrillas_manager.py      # 🚧 Gestión cuadrillas + FIX dialog
+    ├── moderadores_manager.py     # 👤 Gestión moderadores
+    ├── obreros_manager.py         # 👷 Gestión obreros
+    ├── api_client.py              # 🌐 Cliente HTTP centralizado
+    ├── validators.py              # ✅ Validaciones centralizadas
+    ├── ui_components.py           # 🎨 Componentes reutilizables
+    ├── utils.py                   # 🛠️ Utilidades generales
+    └── __init__.py                # 📦 Configuración módulos
+```
+
+### **✅ Funcionalidades Mejoradas v6.0**
+- ✅ **Dialog de Cuadrillas**: Fix completo del problema de layout
+- ✅ **Managers Independientes**: CRUD completo por módulo
+- ✅ **Navegación Optimizada**: MenuPrincipal → Managers especializados
+- ✅ **Componentes Reutilizables**: Dialogs, validaciones, API client
+- ✅ **Compatibilidad**: 100% retrocompatible con main.py
+
+### **🔧 Problemas Técnicos Resueltos**
+- ✅ **Layout roto**: `adaptive_height + MDScrollView` → altura fija calculada
+- ✅ **Código duplicado**: Centralizado en módulos especializados
+- ✅ **Mantenibilidad**: Archivos de 200-800 líneas vs 5,116
+- ✅ **Escalabilidad**: Fácil agregar nuevos managers
+
 ## 📊 **RESUMEN TÉCNICO**
 
 ### **Versión Actual**
-- **Sistema**: `v5.0 - Gestión Completa de Empleados`
+- **Sistema**: `v6.0 - Arquitectura Modular + Fixes Críticos`
 - **Backend**: Flask + MongoDB Atlas
-- **Frontend**: KivyMD Material Design
+- **Frontend**: KivyMD Material Design Modular
 - **Deployment**: Render + GitHub (automático)
 - **Estado**: ✅ **100% OPERATIVO EN PRODUCCIÓN**
 
-### **Últimos Commits Importantes**
-- `d4e12dd`: Validación cruzada moderadores ↔ obreros
-- `304978a`: Módulo completo de obreros CRUD
-- `3ad9be4`: Eliminación segura de moderadores
-- `c6aefd7`: Validación completa formato email
+### **Últimos Commits Importantes v6.0**
+- **Modularización completa**: personal_screen.py → 8 módulos especializados
+- **Fix crítico**: Dialog de edición de cuadrillas completamente funcional
+- **Coordinador**: personal_screen.py como puente entre módulos y main.py
+- **Compatibilidad**: Integración sin romper funcionalidad existente
 
 ### **Módulos Completados**
-- ✅ **Gestión de Personal**: Moderadores + Obreros (CRUD completo)
+- ✅ **Gestión de Personal**: Moderadores + Obreros + Cuadrillas (CRUD modular)
 - ✅ **Sistema de Chat**: Canales + Mensajes (funcional)
 - ✅ **Base de Datos**: MongoDB Atlas (operativa)
 - ✅ **Deployment**: Automático (GitHub → Render)
+- ✅ **Arquitectura Modular**: Sistema escalable y mantenible
 
 ---
 
-**📅 Última actualización**: Módulo completo de gestión de empleados v5.0
-**🏷️ Versión actual**: `PRODUCCIÓN v5.0 - Gestión Completa + Validación Cruzada`
-**📊 Estado**: ✅ **SISTEMA COMPLETAMENTE OPERATIVO**
-**🆕 Funcionalidad**: Obreros CRUD completo + Validación cruzada global
-**🔒 Seguridad**: Unicidad garantizada en todo el sistema
-**🚀 Próximo**: Funcionalidades adicionales según necesidades del negocio
+**📅 Última actualización**: Arquitectura modular frontend v6.0
+**🏷️ Versión actual**: `PRODUCCIÓN v6.0 - Sistema Modular + Fixes Críticos`
+**📊 Estado**: ✅ **SISTEMA COMPLETAMENTE OPERATIVO Y OPTIMIZADO**
+**🆕 Funcionalidad**: Arquitectura modular + Dialog cuadrillas arreglado
+**🔒 Seguridad**: Unicidad garantizada + validaciones centralizadas
+**🏗️ Arquitectura**: Mantenible, escalable y bien estructurada

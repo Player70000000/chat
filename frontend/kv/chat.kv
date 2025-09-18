@@ -1,0 +1,32 @@
+#:kivy 1.11.0
+
+<ChatChannelItem@OneLineListItem>:
+    channel_name: ""
+    divider: "Full"
+    
+    MDIconButton:
+        icon: "pound"
+        theme_icon_color: "Primary"
+        pos_hint: {"center_y": .5}
+        
+<MessageCard@MDCard>:
+    orientation: "vertical"
+    size_hint_y: None
+    height: self.minimum_height
+    padding: "8dp"
+    spacing: "4dp"
+    elevation: 1
+    
+    MDLabel:
+        id: username_label
+        font_style: "Caption"
+        theme_text_color: "Primary"
+        size_hint_y: None
+        height: self.texture_size[1]
+        
+    MDLabel:
+        id: message_label
+        text_size: self.width, None
+        size_hint_y: None
+        height: self.texture_size[1]
+        theme_text_color: "Secondary"

@@ -1,0 +1,30 @@
+#:kivy 1.11.0
+
+# Layout para la navegación personalizada compatible con KivyMD 1.2.0
+
+<CustomTabButton@MDBoxLayout>:
+    orientation: "vertical"
+    size_hint_x: 1
+    spacing: dp(2)
+    tab_name: ""
+    tab_text: ""
+    tab_icon: "help"
+    active: False
+    
+    MDIconButton:
+        id: tab_button
+        icon: root.tab_icon
+        theme_icon_color: "Custom"
+        icon_color: [1, 0.6, 0, 1] if root.active else [1, 1, 1, 0.7]
+        size_hint: (1, None)
+        height: dp(32)
+        
+    MDLabel:
+        id: tab_label
+        text: root.tab_text
+        font_size: dp(10)
+        theme_text_color: "Custom"
+        text_color: [1, 0.6, 0, 1] if root.active else [1, 1, 1, 0.7]
+        halign: "center"
+        size_hint_y: None
+        height: dp(16)

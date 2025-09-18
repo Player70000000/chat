@@ -399,6 +399,11 @@ class ReportesGeneralesManager:
         """Mostrar dropdown de cuadrillas cuando se hace clic en el botón"""
         print(f"🎯 Selector cuadrilla clicked - Cuadrillas disponibles: {len(self.cuadrillas_data)}")
 
+        # Si no hay cuadrillas cargadas, cargar antes de mostrar
+        if not self.cuadrillas_data:
+            print(f"⏳ Cuadrillas no cargadas, cargando ahora...")
+            self._cargar_cuadrillas_data()
+
         if self.cuadrillas_data:
             print(f"📋 Listando cuadrillas disponibles:")
             for i, c in enumerate(self.cuadrillas_data):
@@ -425,8 +430,8 @@ class ReportesGeneralesManager:
             )
             dropdown_menu.open()
         else:
-            print(f"❌ No hay cuadrillas disponibles - self.cuadrillas_data está vacío")
-            self._mostrar_error_dialog("No hay cuadrillas disponibles")
+            print(f"❌ Aún no hay cuadrillas después de recargar")
+            self._mostrar_error_dialog("Error cargando cuadrillas. Verifica tu conexión.")
 
 
     def _on_cuadrilla_selected(self, cuadrilla_data):

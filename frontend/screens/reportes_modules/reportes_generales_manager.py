@@ -370,24 +370,40 @@ class ReportesGeneralesManager:
     def _cargar_cuadrillas_data(self):
         """Cargar datos de cuadrillas desde la API"""
         try:
-            response = requests.get(
-                f"{self.api_client.base_url}/api/personnel/cuadrillas/",
-                timeout=10
-            )
+            url = f"{self.api_client.base_url}/api/personnel/cuadrillas/"
+            print(f"🔗 Cargando cuadrillas desde: {url}")
+
+            response = requests.get(url, timeout=10)
+            print(f"📡 Status code: {response.status_code}")
 
             if response.status_code == 200:
                 data = response.json()
+                print(f"📊 Data recibida: {data}")
                 if data.get('success'):
-                    self.cuadrillas_data = data.get('cuadrillas', [])
+                    cuadrillas = data.get('cuadrillas', [])
+                    print(f"✅ Cuadrillas encontradas: {len(cuadrillas)}")
+                    for i, c in enumerate(cuadrillas):
+                        print(f"  {i+1}. {c.get('numero_cuadrilla', 'N/A')}")
+                    self.cuadrillas_data = cuadrillas
                 else:
+                    print(f"❌ API retornó success=False: {data.get('error', 'Sin error')}")
                     self.cuadrillas_data = []
+            else:
+                print(f"❌ Error HTTP: {response.status_code}")
+                self.cuadrillas_data = []
         except Exception as e:
             self.cuadrillas_data = []
-            print(f"Error cargando cuadrillas: {str(e)}")
+            print(f"💥 Error cargando cuadrillas: {str(e)}")
 
     def _mostrar_selector_cuadrilla(self, instance):
         """Mostrar dropdown de cuadrillas cuando se hace clic en el botón"""
+        print(f"🎯 Selector cuadrilla clicked - Cuadrillas disponibles: {len(self.cuadrillas_data)}")
+
         if self.cuadrillas_data:
+            print(f"📋 Listando cuadrillas disponibles:")
+            for i, c in enumerate(self.cuadrillas_data):
+                print(f"  {i+1}. {c.get('numero_cuadrilla', 'N/A')} - {c.get('actividad', 'Sin actividad')}")
+
             # Crear lista de items para el dropdown
             menu_items = []
             for cuadrilla in self.cuadrillas_data:
@@ -396,6 +412,8 @@ class ReportesGeneralesManager:
                     "text": numero,
                     "on_release": lambda x=None, cuad=cuadrilla: self._on_cuadrilla_selected(cuad)
                 })
+
+            print(f"📝 Items del dropdown: {len(menu_items)}")
 
             # Crear y mostrar dropdown
             dropdown_menu = MDDropdownMenu(
@@ -407,6 +425,7 @@ class ReportesGeneralesManager:
             )
             dropdown_menu.open()
         else:
+            print(f"❌ No hay cuadrillas disponibles - self.cuadrillas_data está vacío")
             self._mostrar_error_dialog("No hay cuadrillas disponibles")
 
 

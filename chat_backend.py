@@ -28,7 +28,7 @@ from funciones.utils_functions import (
 from funciones.reports_functions import (
     generar_reporte_moderadores, listar_reportes_moderadores,
     generar_reporte_obreros, listar_reportes_obreros,
-    generar_reporte_general, listar_reportes_generales
+    generar_reporte_general, listar_reportes_generales, eliminar_reporte_general
 )
 
 # Configuración básica de logging
@@ -123,6 +123,25 @@ def api_generar_reporte_general():
         }), 500
 
 app.route('/api/reports/generales/listar', methods=['GET'])(listar_reportes_generales)
+
+@app.route('/api/reports/generales/<reporte_id>', methods=['DELETE'])
+def api_eliminar_reporte_general(reporte_id):
+    """Endpoint para eliminar reportes generales por ID"""
+    try:
+        if not reporte_id:
+            return jsonify({
+                "success": False,
+                "error": "ID de reporte requerido"
+            }), 400
+
+        return eliminar_reporte_general(reporte_id)
+
+    except Exception as e:
+        logger.error(f"❌ Error en endpoint eliminar reporte general: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Error interno del servidor: {str(e)}"
+        }), 500
 
 # ==================== ERROR HANDLERS ====================
 

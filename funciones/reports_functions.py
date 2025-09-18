@@ -644,7 +644,21 @@ def generar_reporte_general(reporte_data):
                 "error": "Faltan datos obligatorios: cuadrilla, municipio o herramientas"
             }), 400
 
-        # 2. Obtener número de reporte siguiente
+        # 2. Obtener detalles completos de la cuadrilla
+        cuadrilla_info = None
+        try:
+            cuadrillas_collection = db.cuadrillas
+            cuadrilla_doc = cuadrillas_collection.find_one({"numero_cuadrilla": cuadrilla})
+            if cuadrilla_doc:
+                cuadrilla_info = {
+                    "moderador": cuadrilla_doc.get("moderador", {}),
+                    "obreros": cuadrilla_doc.get("obreros", []),
+                    "numero_obreros": cuadrilla_doc.get("numero_obreros", 0)
+                }
+        except Exception as e:
+            logger.warning(f"No se pudieron obtener detalles de cuadrilla {cuadrilla}: {str(e)}")
+
+        # 3. Obtener número de reporte siguiente
         db = get_db()
         reportes_collection = db.reportes_generales
 
@@ -674,15 +688,15 @@ def generar_reporte_general(reporte_data):
         archivo_creado = False
         if REPORTLAB_AVAILABLE:
             archivo_creado = _crear_pdf_general(
-                pdf_path, reporte_data, numero_reporte, fecha_actual
+                pdf_path, reporte_data, numero_reporte, fecha_actual, cuadrilla_info
             )
 
         if not archivo_creado:
             # Fallback: crear archivo de texto
             txt_filename = f"reporte_general_N{numero_reporte}_{fecha_str}.txt"
-            txt_path = os.path.join(reportes_dir, txt_filename)
+            txt_path = os.path.join("static", "reportes", txt_filename)
             archivo_creado = _crear_texto_simulado_general(
-                txt_path, reporte_data, numero_reporte, fecha_actual
+                txt_path, reporte_data, numero_reporte, fecha_actual, cuadrilla_info
             )
             pdf_filename = txt_filename
             pdf_path = txt_path
@@ -791,7 +805,7 @@ def listar_reportes_generales():
         }), 500
 
 
-def _crear_texto_simulado_general(txt_path, reporte_data, numero_reporte, fecha_creacion):
+def _crear_texto_simulado_general(txt_path, reporte_data, numero_reporte, fecha_creacion, cuadrilla_info=None):
     """
     Crear archivo de texto simulando PDF para testing local (reportes generales)
     """
@@ -832,6 +846,31 @@ def _crear_texto_simulado_general(txt_path, reporte_data, numero_reporte, fecha_
             f.write(f"Total dañadas: {total_dañadas}\n")
             f.write(f"Herramientas en buen estado: {total_utilizadas - total_perdidas - total_dañadas}\n\n")
 
+            # Detalles de la cuadrilla
+            if cuadrilla_info:
+                f.write("DETALLES DE LA CUADRILLA:\n")
+                f.write("-" * 30 + "\n")
+
+                # Información del moderador
+                moderador = cuadrilla_info.get("moderador", {})
+                if moderador:
+                    nombre_mod = moderador.get("nombre", "")
+                    apellidos_mod = moderador.get("apellidos", "")
+                    cedula_mod = moderador.get("cedula", "")
+                    f.write(f"Moderador: {nombre_mod} {apellidos_mod} {cedula_mod}\n\n")
+
+                # Información de los obreros
+                obreros = cuadrilla_info.get("obreros", [])
+                numero_obreros = cuadrilla_info.get("numero_obreros", len(obreros))
+                if obreros:
+                    f.write(f"Obreros({numero_obreros}):\n")
+                    for i, obrero in enumerate(obreros, 1):
+                        nombre_ob = obrero.get("nombre", "")
+                        apellidos_ob = obrero.get("apellidos", "")
+                        cedula_ob = obrero.get("cedula", "")
+                        f.write(f"  {i}.) {nombre_ob} {apellidos_ob} {cedula_ob}\n")
+                    f.write("\n")
+
             # Detalles adicionales
             detalles = reporte_data.get("detalles_adicionales", "")
             if detalles:
@@ -850,7 +889,7 @@ def _crear_texto_simulado_general(txt_path, reporte_data, numero_reporte, fecha_
         logger.error(f"❌ Error creando archivo simulado: {str(e)}")
         return False
 
-def _crear_pdf_general(pdf_path, reporte_data, numero_reporte, fecha_creacion):
+def _crear_pdf_general(pdf_path, reporte_data, numero_reporte, fecha_creacion, cuadrilla_info=None):
     """
     Crear PDF con formato específico de reportes generales
     """
@@ -945,6 +984,31 @@ def _crear_pdf_general(pdf_path, reporte_data, numero_reporte, fecha_creacion):
 
         for item in resumen:
             story.append(Paragraph(item, normal_style))
+
+        # Detalles de la cuadrilla
+        if cuadrilla_info:
+            story.append(Spacer(1, 12))
+            story.append(Paragraph("DETALLES DE LA CUADRILLA:", subtitle_style))
+
+            # Información del moderador
+            moderador = cuadrilla_info.get("moderador", {})
+            if moderador:
+                nombre_mod = moderador.get("nombre", "")
+                apellidos_mod = moderador.get("apellidos", "")
+                cedula_mod = moderador.get("cedula", "")
+                story.append(Paragraph(f"Moderador: {nombre_mod} {apellidos_mod} {cedula_mod}", normal_style))
+                story.append(Spacer(1, 6))
+
+            # Información de los obreros
+            obreros = cuadrilla_info.get("obreros", [])
+            numero_obreros = cuadrilla_info.get("numero_obreros", len(obreros))
+            if obreros:
+                story.append(Paragraph(f"Obreros({numero_obreros}):", normal_style))
+                for i, obrero in enumerate(obreros, 1):
+                    nombre_ob = obrero.get("nombre", "")
+                    apellidos_ob = obrero.get("apellidos", "")
+                    cedula_ob = obrero.get("cedula", "")
+                    story.append(Paragraph(f"  {i}.) {nombre_ob} {apellidos_ob} {cedula_ob}", normal_style))
 
         # Detalles adicionales
         detalles = reporte_data.get("detalles_adicionales", "")

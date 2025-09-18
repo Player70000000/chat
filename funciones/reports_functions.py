@@ -265,19 +265,26 @@ def _crear_pdf_moderadores(pdf_path, moderadores, numero_reporte, fecha_creacion
             # Espacio entre moderadores
             story.append(Spacer(1, 12))
 
-        # Fecha de creación del reporte (esquina inferior derecha)
-        story.append(Spacer(1, 50))
-        fecha_reporte = fecha_creacion.strftime("%d/%m/%Y %H:%M")
-        fecha_style = ParagraphStyle(
-            'FechaReporte',
-            parent=styles['Normal'],
-            fontSize=10,
-            alignment=TA_CENTER
-        )
-        story.append(Paragraph(f"Fecha de creación del reporte: {fecha_reporte}", fecha_style))
+        # Construir PDF con función personalizada para pie de página
+        def agregar_pie_pagina(canvas, doc):
+            """Agregar fecha en pie de página derecha"""
+            fecha_reporte = fecha_creacion.strftime("%d/%m/%Y %H:%M")
+            canvas.saveState()
+            # Configurar estilo: gris suave, tamaño reducido
+            canvas.setFillColorRGB(0.6, 0.6, 0.6)  # Gris suave
+            canvas.setFont("Helvetica", 8)  # Tamaño reducido pero legible
 
-        # Construir PDF
-        doc.build(story)
+            # Posición: esquina inferior derecha
+            page_width, page_height = A4
+            canvas.drawRightString(
+                page_width - 72,  # Margen derecho
+                30,  # Altura desde el fondo
+                f"Fecha de creación: {fecha_reporte}"
+            )
+            canvas.restoreState()
+
+        # Construir PDF con pie de página personalizado
+        doc.build(story, onFirstPage=agregar_pie_pagina, onLaterPages=agregar_pie_pagina)
 
         logger.info(f"📄 PDF creado exitosamente: {pdf_path}")
         return True
@@ -558,19 +565,26 @@ def _crear_pdf_obreros(pdf_path, obreros, numero_reporte, fecha_creacion, total_
             # Espacio entre obreros
             story.append(Spacer(1, 12))
 
-        # Fecha de creación del reporte (esquina inferior derecha)
-        story.append(Spacer(1, 50))
-        fecha_reporte = fecha_creacion.strftime("%d/%m/%Y %H:%M")
-        fecha_style = ParagraphStyle(
-            'FechaReporte',
-            parent=styles['Normal'],
-            fontSize=10,
-            alignment=TA_CENTER
-        )
-        story.append(Paragraph(f"Fecha de creación del reporte: {fecha_reporte}", fecha_style))
+        # Construir PDF con función personalizada para pie de página
+        def agregar_pie_pagina(canvas, doc):
+            """Agregar fecha en pie de página derecha"""
+            fecha_reporte = fecha_creacion.strftime("%d/%m/%Y %H:%M")
+            canvas.saveState()
+            # Configurar estilo: gris suave, tamaño reducido
+            canvas.setFillColorRGB(0.6, 0.6, 0.6)  # Gris suave
+            canvas.setFont("Helvetica", 8)  # Tamaño reducido pero legible
 
-        # Construir PDF
-        doc.build(story)
+            # Posición: esquina inferior derecha
+            page_width, page_height = A4
+            canvas.drawRightString(
+                page_width - 72,  # Margen derecho
+                30,  # Altura desde el fondo
+                f"Fecha de creación: {fecha_reporte}"
+            )
+            canvas.restoreState()
+
+        # Construir PDF con pie de página personalizado
+        doc.build(story, onFirstPage=agregar_pie_pagina, onLaterPages=agregar_pie_pagina)
 
         logger.info(f"📄 PDF creado exitosamente: {pdf_path}")
         return True

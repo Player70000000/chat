@@ -27,7 +27,8 @@ from funciones.utils_functions import (
 )
 from funciones.reports_functions import (
     generar_reporte_moderadores, listar_reportes_moderadores,
-    generar_reporte_obreros, listar_reportes_obreros
+    generar_reporte_obreros, listar_reportes_obreros,
+    generar_reporte_general, listar_reportes_generales
 )
 
 # Configuración básica de logging
@@ -99,6 +100,29 @@ app.route('/api/reports/moderadores/generar', methods=['POST'])(generar_reporte_
 app.route('/api/reports/moderadores/listar', methods=['GET'])(listar_reportes_moderadores)
 app.route('/api/reports/obreros/generar', methods=['POST'])(generar_reporte_obreros)
 app.route('/api/reports/obreros/listar', methods=['GET'])(listar_reportes_obreros)
+
+# Endpoints de reportes generales
+@app.route('/api/reports/generales/generar', methods=['POST'])
+def api_generar_reporte_general():
+    """Endpoint para generar reportes generales de cuadrillas"""
+    try:
+        reporte_data = request.get_json()
+        if not reporte_data:
+            return jsonify({
+                "success": False,
+                "error": "No se recibieron datos del reporte"
+            }), 400
+
+        return generar_reporte_general(reporte_data)
+
+    except Exception as e:
+        logger.error(f"❌ Error en endpoint generar reporte general: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Error interno del servidor: {str(e)}"
+        }), 500
+
+app.route('/api/reports/generales/listar', methods=['GET'])(listar_reportes_generales)
 
 # ==================== ERROR HANDLERS ====================
 

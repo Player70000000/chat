@@ -617,3 +617,361 @@ def listar_reportes_obreros():
             "success": False,
             "error": f"Error interno: {str(e)}"
         }), 500
+
+# ================================
+# REPORTES GENERALES (CUADRILLAS)
+# ================================
+
+def generar_reporte_general(reporte_data):
+    """
+    Generar reporte PDF de trabajo general (cuadrillas con herramientas)
+    Retorna: JSON con información del reporte generado
+    """
+    try:
+        logger.info("🔄 Iniciando generación de reporte general de cuadrillas")
+
+        # 1. Validar datos recibidos
+        cuadrilla = reporte_data.get("cuadrilla", "")
+        actividad = reporte_data.get("actividad", "")
+        municipio = reporte_data.get("municipio", "")
+        distancia_metros = reporte_data.get("distancia_metros", 0)
+        herramientas = reporte_data.get("herramientas", [])
+        detalles_adicionales = reporte_data.get("detalles_adicionales", "")
+
+        if not cuadrilla or not municipio or not herramientas:
+            return jsonify({
+                "success": False,
+                "error": "Faltan datos obligatorios: cuadrilla, municipio o herramientas"
+            }), 400
+
+        # 2. Obtener número de reporte siguiente
+        db = get_db()
+        reportes_collection = db.reportes_generales
+
+        # Buscar el último número de reporte
+        ultimo_reporte = reportes_collection.find_one(
+            {"tipo": "general"},
+            sort=[("numero_reporte", -1)]
+        )
+
+        if ultimo_reporte:
+            numero_reporte = ultimo_reporte["numero_reporte"] + 1
+        else:
+            numero_reporte = 1
+
+        # 3. Preparar datos del archivo
+        fecha_actual = datetime.now()
+        fecha_str = fecha_actual.strftime("%Y%m%d_%H%M%S")
+
+        # Crear directorio si no existe
+        reportes_dir = "/tmp/static/reportes"
+        os.makedirs(reportes_dir, exist_ok=True)
+
+        # Nombre del archivo
+        pdf_filename = f"reporte_general_N{numero_reporte}_{fecha_str}.pdf"
+        pdf_path = os.path.join(reportes_dir, pdf_filename)
+
+        # 4. Generar archivo (PDF o texto según disponibilidad)
+        archivo_creado = False
+        if REPORTLAB_AVAILABLE:
+            archivo_creado = _crear_pdf_general(
+                pdf_path, reporte_data, numero_reporte, fecha_actual
+            )
+
+        if not archivo_creado:
+            # Fallback: crear archivo de texto
+            txt_filename = f"reporte_general_N{numero_reporte}_{fecha_str}.txt"
+            txt_path = os.path.join(reportes_dir, txt_filename)
+            archivo_creado = _crear_texto_simulado_general(
+                txt_path, reporte_data, numero_reporte, fecha_actual
+            )
+            pdf_filename = txt_filename
+            pdf_path = txt_path
+
+        if not archivo_creado:
+            return jsonify({
+                "success": False,
+                "error": "No se pudo crear el archivo del reporte"
+            }), 500
+
+        # 5. Guardar información en BD
+        total_herramientas = len(herramientas)
+        total_herramientas_utilizadas = sum(h.get("cantidad_utilizada", 0) for h in herramientas)
+        total_perdidas = sum(h.get("perdidas", 0) for h in herramientas)
+        total_dañadas = sum(h.get("dañadas", 0) for h in herramientas)
+
+        reporte_data_bd = {
+            "numero_reporte": numero_reporte,
+            "fecha_creacion": fecha_actual,
+            "cuadrilla": cuadrilla,
+            "actividad": actividad,
+            "municipio": municipio,
+            "distancia_metros": distancia_metros,
+            "herramientas": herramientas,
+            "detalles_adicionales": detalles_adicionales,
+            "resumen": {
+                "total_herramientas": total_herramientas,
+                "total_utilizadas": total_herramientas_utilizadas,
+                "total_perdidas": total_perdidas,
+                "total_dañadas": total_dañadas
+            },
+            "pdf_path": pdf_path,
+            "pdf_filename": pdf_filename,
+            "estado": "generado",
+            "tipo": "general"
+        }
+
+        resultado = reportes_collection.insert_one(reporte_data_bd)
+        reporte_id = str(resultado.inserted_id)
+
+        logger.info(f"✅ Reporte general generado exitosamente: N°{numero_reporte}")
+
+        # 6. Retornar información del reporte
+        return jsonify({
+            "success": True,
+            "reporte": {
+                "id": reporte_id,
+                "numero_reporte": numero_reporte,
+                "fecha_creacion": fecha_actual.isoformat(),
+                "cuadrilla": cuadrilla,
+                "actividad": actividad,
+                "municipio": municipio,
+                "total_herramientas": total_herramientas,
+                "pdf_url": f"/static/reportes/{pdf_filename}",
+                "estado": "generado"
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Error generando reporte general: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Error interno: {str(e)}"
+        }), 500
+
+def listar_reportes_generales():
+    """
+    Listar todos los reportes generales generados
+    """
+    try:
+        db = get_db()
+        reportes_collection = db.reportes_generales
+
+        # Obtener reportes ordenados por fecha (más recientes primero)
+        reportes = list(reportes_collection.find(
+            {"tipo": "general"},
+            sort=[("fecha_creacion", -1)]
+        ))
+
+        # Formatear datos para el frontend
+        reportes_formateados = []
+        for reporte in reportes:
+            reportes_formateados.append({
+                "id": str(reporte["_id"]),
+                "numero_reporte": reporte["numero_reporte"],
+                "fecha_creacion": reporte["fecha_creacion"].isoformat(),
+                "cuadrilla": reporte["cuadrilla"],
+                "actividad": reporte["actividad"],
+                "municipio": reporte["municipio"],
+                "total_herramientas": reporte.get("resumen", {}).get("total_herramientas", 0),
+                "pdf_url": f"/static/reportes/{reporte[\"pdf_filename\"]}",
+                "estado": reporte.get("estado", "generado")
+            })
+
+        return jsonify({
+            "success": True,
+            "reportes": reportes_formateados,
+            "total": len(reportes_formateados)
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Error listando reportes generales: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Error interno: {str(e)}"
+        }), 500
+
+
+def _crear_texto_simulado_general(txt_path, reporte_data, numero_reporte, fecha_creacion):
+    """
+    Crear archivo de texto simulando PDF para testing local (reportes generales)
+    """
+    try:
+        with open(txt_path, "w", encoding="utf-8") as f:
+            f.write("CORPOTACHIRA Reportes\n")
+            f.write("=" * 50 + "\n\n")
+            f.write(f"Reporte General de Trabajo N°{numero_reporte}\n\n")
+
+            # Información básica
+            f.write("INFORMACIÓN DEL TRABAJO:\n")
+            f.write("-" * 30 + "\n")
+            f.write(f"Cuadrilla: {reporte_data.get(\"cuadrilla\", \"N/A\")}\n")
+            f.write(f"Actividad: {reporte_data.get(\"actividad\", \"N/A\")}\n")
+            f.write(f"Municipio: {reporte_data.get(\"municipio\", \"N/A\")}\n")
+            f.write(f"Distancia recorrida: {reporte_data.get(\"distancia_metros\", 0)} metros\n\n")
+
+            # Herramientas utilizadas
+            herramientas = reporte_data.get("herramientas", [])
+            f.write("HERRAMIENTAS UTILIZADAS:\n")
+            f.write("-" * 30 + "\n")
+
+            for i, herramienta in enumerate(herramientas, 1):
+                f.write(f"{i}. {herramienta.get(\"nombre\", \"Sin nombre\")}\n")
+                f.write(f"   Cantidad utilizada: {herramienta.get(\"cantidad_utilizada\", 0)}\n")
+                f.write(f"   Perdidas: {herramienta.get(\"perdidas\", 0)}\n")
+                f.write(f"   Dañadas: {herramienta.get(\"dañadas\", 0)}\n\n")
+
+            # Resumen de herramientas
+            total_utilizadas = sum(h.get("cantidad_utilizada", 0) for h in herramientas)
+            total_perdidas = sum(h.get("perdidas", 0) for h in herramientas)
+            total_dañadas = sum(h.get("dañadas", 0) for h in herramientas)
+
+            f.write("RESUMEN:\n")
+            f.write("-" * 30 + "\n")
+            f.write(f"Total herramientas utilizadas: {total_utilizadas}\n")
+            f.write(f"Total perdidas: {total_perdidas}\n")
+            f.write(f"Total dañadas: {total_dañadas}\n")
+            f.write(f"Herramientas en buen estado: {total_utilizadas - total_perdidas - total_dañadas}\n\n")
+
+            # Detalles adicionales
+            detalles = reporte_data.get("detalles_adicionales", "")
+            if detalles:
+                f.write("DETALLES ADICIONALES:\n")
+                f.write("-" * 30 + "\n")
+                f.write(f"{detalles}\n\n")
+
+            # Fecha del reporte
+            fecha_reporte = fecha_creacion.strftime("%d/%m/%Y %H:%M")
+            f.write(f"Fecha de creación del reporte: {fecha_reporte}\n")
+
+        logger.info(f"📄 Archivo de texto simulado creado: {txt_path}")
+        return True
+
+    except Exception as e:
+        logger.error(f"❌ Error creando archivo simulado: {str(e)}")
+        return False
+
+def _crear_pdf_general(pdf_path, reporte_data, numero_reporte, fecha_creacion):
+    """
+    Crear PDF con formato específico de reportes generales
+    """
+    if not REPORTLAB_AVAILABLE:
+        return False
+
+    try:
+        # Crear documento PDF
+        doc = SimpleDocTemplate(
+            pdf_path,
+            pagesize=A4,
+            rightMargin=72,
+            leftMargin=72,
+            topMargin=72,
+            bottomMargin=18
+        )
+
+        # Estilos
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "CustomTitle",
+            parent=styles["Heading1"],
+            fontSize=16,
+            spaceAfter=30,
+            alignment=TA_CENTER
+        )
+
+        subtitle_style = ParagraphStyle(
+            "CustomSubtitle",
+            parent=styles["Heading2"],
+            fontSize=14,
+            spaceAfter=20,
+            alignment=TA_LEFT
+        )
+
+        normal_style = ParagraphStyle(
+            "CustomNormal",
+            parent=styles["Normal"],
+            fontSize=10,
+            spaceAfter=6,
+            alignment=TA_LEFT
+        )
+
+        # Contenido del PDF
+        story = []
+
+        # Título principal
+        story.append(Paragraph("CORPOTACHIRA Reportes", title_style))
+        story.append(Spacer(1, 12))
+
+        # Subtítulo con número de reporte
+        story.append(Paragraph(f"Reporte General de Trabajo N°{numero_reporte}", subtitle_style))
+        story.append(Spacer(1, 12))
+
+        # Información básica del trabajo
+        story.append(Paragraph("INFORMACIÓN DEL TRABAJO:", subtitle_style))
+        info_trabajo = [
+            f"Cuadrilla: {reporte_data.get(\"cuadrilla\", \"N/A\")}",
+            f"Actividad: {reporte_data.get(\"actividad\", \"N/A\")}",
+            f"Municipio: {reporte_data.get(\"municipio\", \"N/A\")}",
+            f"Distancia recorrida: {reporte_data.get(\"distancia_metros\", 0)} metros"
+        ]
+
+        for info in info_trabajo:
+            story.append(Paragraph(info, normal_style))
+        story.append(Spacer(1, 12))
+
+        # Herramientas utilizadas
+        herramientas = reporte_data.get("herramientas", [])
+        story.append(Paragraph("HERRAMIENTAS UTILIZADAS:", subtitle_style))
+
+        for i, herramienta in enumerate(herramientas, 1):
+            story.append(Paragraph(f"{i}. {herramienta.get(\"nombre\", \"Sin nombre\")}", normal_style))
+            story.append(Paragraph(f"   Cantidad utilizada: {herramienta.get(\"cantidad_utilizada\", 0)}", normal_style))
+            story.append(Paragraph(f"   Perdidas: {herramienta.get(\"perdidas\", 0)}", normal_style))
+            story.append(Paragraph(f"   Dañadas: {herramienta.get(\"dañadas\", 0)}", normal_style))
+            story.append(Spacer(1, 6))
+
+        # Resumen de herramientas
+        total_utilizadas = sum(h.get("cantidad_utilizada", 0) for h in herramientas)
+        total_perdidas = sum(h.get("perdidas", 0) for h in herramientas)
+        total_dañadas = sum(h.get("dañadas", 0) for h in herramientas)
+
+        story.append(Spacer(1, 12))
+        story.append(Paragraph("RESUMEN:", subtitle_style))
+        resumen = [
+            f"Total herramientas utilizadas: {total_utilizadas}",
+            f"Total perdidas: {total_perdidas}",
+            f"Total dañadas: {total_dañadas}",
+            f"Herramientas en buen estado: {total_utilizadas - total_perdidas - total_dañadas}"
+        ]
+
+        for item in resumen:
+            story.append(Paragraph(item, normal_style))
+
+        # Detalles adicionales
+        detalles = reporte_data.get("detalles_adicionales", "")
+        if detalles:
+            story.append(Spacer(1, 12))
+            story.append(Paragraph("DETALLES ADICIONALES:", subtitle_style))
+            story.append(Paragraph(detalles, normal_style))
+
+        # Fecha de creación del reporte
+        story.append(Spacer(1, 50))
+        fecha_reporte = fecha_creacion.strftime("%d/%m/%Y %H:%M")
+        fecha_style = ParagraphStyle(
+            "FechaReporte",
+            parent=styles["Normal"],
+            fontSize=10,
+            alignment=TA_CENTER
+        )
+        story.append(Paragraph(f"Fecha de creación del reporte: {fecha_reporte}", fecha_style))
+
+        # Construir PDF
+        doc.build(story)
+
+        logger.info(f"📄 PDF creado exitosamente: {pdf_path}")
+        return True
+
+    except Exception as e:
+        logger.error(f"❌ Error creando PDF: {str(e)}")
+        return False
+

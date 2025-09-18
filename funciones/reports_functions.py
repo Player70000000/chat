@@ -646,6 +646,7 @@ def generar_reporte_general(reporte_data):
 
         # 2. Obtener detalles completos de la cuadrilla
         cuadrilla_info = None
+        db = get_db()  # Mover aquí para tener acceso a la BD
         try:
             cuadrillas_collection = db.cuadrillas
             logger.info(f"🔍 Buscando cuadrilla: '{cuadrilla}'")
@@ -665,7 +666,6 @@ def generar_reporte_general(reporte_data):
             logger.error(f"❌ Error obteniendo detalles de cuadrilla {cuadrilla}: {str(e)}")
 
         # 3. Obtener número de reporte siguiente
-        db = get_db()
         reportes_collection = db.reportes_generales
 
         # Buscar el último número de reporte

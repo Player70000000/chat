@@ -12,6 +12,7 @@ from kivymd.uix.label import MDLabel
 from kivymd.uix.list import MDList, OneLineListItem
 from kivymd.uix.textfield import MDTextField
 from kivymd.uix.gridlayout import MDGridLayout
+from kivymd.uix.menu import MDDropdownMenu
 from kivy.clock import Clock
 from kivy.metrics import dp
 import requests
@@ -385,57 +386,32 @@ class ReportesGeneralesManager:
             print(f"Error cargando cuadrillas: {str(e)}")
 
     def _mostrar_selector_cuadrilla(self, instance):
-        """Mostrar selector de cuadrilla cuando se hace clic en el botón"""
+        """Mostrar dropdown de cuadrillas cuando se hace clic en el botón"""
         if self.cuadrillas_data:
-            # Crear lista de opciones
-            opciones = []
+            # Crear lista de items para el dropdown
+            menu_items = []
             for cuadrilla in self.cuadrillas_data:
                 numero = cuadrilla.get('numero_cuadrilla', 'N/A')
-                opciones.append({
-                    'text': numero,
-                    'data': cuadrilla
+                menu_items.append({
+                    "text": numero,
+                    "on_release": lambda x=None, cuad=cuadrilla: self._on_cuadrilla_selected(cuad)
                 })
 
-            # Mostrar dialog selector
-            self._mostrar_dialog_selector(opciones, self._seleccionar_cuadrilla)
-
-    def _mostrar_dialog_selector(self, opciones, callback):
-        """Mostrar dialog genérico de selección"""
-        if not opciones:
-            self._mostrar_error_dialog("No hay cuadrillas disponibles")
-            return
-
-        # Layout para lista de opciones
-        lista_layout = MDBoxLayout(orientation="vertical", spacing="5dp")
-
-        for opcion in opciones:
-            item_btn = MDRaisedButton(
-                text=opcion['text'],
-                size_hint_y=None,
-                height="40dp",
-                on_release=lambda x, opt=opcion: [
-                    callback(opt['data']),
-                    self.selector_dialog.dismiss()
-                ]
+            # Crear y mostrar dropdown
+            dropdown_menu = MDDropdownMenu(
+                caller=instance,
+                items=menu_items,
+                width_mult=3,
+                max_height="200dp",
+                position="bottom"
             )
-            lista_layout.add_widget(item_btn)
+            dropdown_menu.open()
+        else:
+            self._mostrar_error_dialog("No hay cuadrillas disponibles")
 
-        # Crear dialog
-        self.selector_dialog = MDDialog(
-            title="Seleccionar Cuadrilla",
-            type="custom",
-            content_cls=lista_layout,
-            buttons=[
-                MDRaisedButton(
-                    text="Cancelar",
-                    on_release=lambda x: self.selector_dialog.dismiss()
-                )
-            ]
-        )
-        self.selector_dialog.open()
 
-    def _seleccionar_cuadrilla(self, cuadrilla_data):
-        """Callback cuando se selecciona una cuadrilla"""
+    def _on_cuadrilla_selected(self, cuadrilla_data):
+        """Callback cuando se selecciona una cuadrilla del dropdown"""
         numero = cuadrilla_data.get('numero_cuadrilla', 'N/A')
         actividad = cuadrilla_data.get('actividad', 'Sin actividad')
 

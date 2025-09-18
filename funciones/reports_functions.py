@@ -648,15 +648,21 @@ def generar_reporte_general(reporte_data):
         cuadrilla_info = None
         try:
             cuadrillas_collection = db.cuadrillas
+            logger.info(f"🔍 Buscando cuadrilla: '{cuadrilla}'")
             cuadrilla_doc = cuadrillas_collection.find_one({"numero_cuadrilla": cuadrilla})
+            logger.info(f"📄 Documento encontrado: {cuadrilla_doc is not None}")
+
             if cuadrilla_doc:
                 cuadrilla_info = {
                     "moderador": cuadrilla_doc.get("moderador", {}),
                     "obreros": cuadrilla_doc.get("obreros", []),
                     "numero_obreros": cuadrilla_doc.get("numero_obreros", 0)
                 }
+                logger.info(f"✅ Cuadrilla_info obtenida: moderador={bool(cuadrilla_info['moderador'])}, obreros={len(cuadrilla_info['obreros'])}")
+            else:
+                logger.warning(f"❌ No se encontró cuadrilla con numero_cuadrilla: '{cuadrilla}'")
         except Exception as e:
-            logger.warning(f"No se pudieron obtener detalles de cuadrilla {cuadrilla}: {str(e)}")
+            logger.error(f"❌ Error obteniendo detalles de cuadrilla {cuadrilla}: {str(e)}")
 
         # 3. Obtener número de reporte siguiente
         db = get_db()
@@ -986,7 +992,9 @@ def _crear_pdf_general(pdf_path, reporte_data, numero_reporte, fecha_creacion, c
             story.append(Paragraph(item, normal_style))
 
         # Detalles de la cuadrilla
+        logger.info(f"🔧 PDF: cuadrilla_info = {cuadrilla_info}")
         if cuadrilla_info:
+            logger.info("✅ Agregando detalles de cuadrilla al PDF")
             story.append(Spacer(1, 12))
             story.append(Paragraph("DETALLES DE LA CUADRILLA:", subtitle_style))
 

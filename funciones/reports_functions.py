@@ -1144,3 +1144,169 @@ def eliminar_reporte_general(reporte_id):
             "success": False,
             "error": f"Error interno del servidor: {str(e)}"
         }), 500
+
+def eliminar_reporte_obreros(reporte_id):
+    """
+    Eliminar reporte de obreros por ID
+    Elimina tanto el archivo PDF como el registro de la base de datos
+    """
+    try:
+        from bson import ObjectId
+        import os
+        from flask import jsonify
+
+        # Validar que el ID sea un ObjectId válido
+        try:
+            object_id = ObjectId(reporte_id)
+        except Exception:
+            return jsonify({
+                "success": False,
+                "error": "ID de reporte inválido"
+            }), 400
+
+        # Conectar a la base de datos
+        db = get_db()
+        reportes_collection = db.reportes_obreros
+
+        # Buscar el reporte antes de eliminarlo
+        reporte = reportes_collection.find_one({
+            "_id": object_id,
+            "tipo": "obreros"
+        })
+
+        if not reporte:
+            return jsonify({
+                "success": False,
+                "error": "Reporte no encontrado"
+            }), 404
+
+        # Obtener información del reporte para logging
+        numero_reporte = reporte.get("numero_reporte", "N/A")
+        total_obreros = reporte.get("total_obreros", "N/A")
+        pdf_filename = reporte.get("pdf_filename", "")
+
+        logger.info(f"🗑️ Iniciando eliminación del reporte de obreros N°{numero_reporte} - {total_obreros} obreros")
+
+        # Eliminar archivo PDF si existe
+        if pdf_filename:
+            try:
+                pdf_path = os.path.join("static", "reportes", pdf_filename)
+                if os.path.exists(pdf_path):
+                    os.remove(pdf_path)
+                    logger.info(f"🗑️ Archivo PDF eliminado: {pdf_path}")
+                else:
+                    logger.warning(f"⚠️ Archivo PDF no encontrado: {pdf_path}")
+            except Exception as e:
+                logger.error(f"❌ Error eliminando archivo PDF: {str(e)}")
+                # Continuar con la eliminación de BD aunque falle el archivo
+
+        # Eliminar registro de la base de datos
+        resultado = reportes_collection.delete_one({"_id": object_id})
+
+        if resultado.deleted_count == 0:
+            return jsonify({
+                "success": False,
+                "error": "No se pudo eliminar el reporte de la base de datos"
+            }), 500
+
+        logger.info(f"✅ Reporte de obreros eliminado exitosamente: N°{numero_reporte} - {total_obreros} obreros")
+
+        return jsonify({
+            "success": True,
+            "message": f"Reporte de obreros N°{numero_reporte} eliminado exitosamente",
+            "reporte_eliminado": {
+                "id": str(object_id),
+                "numero_reporte": numero_reporte,
+                "total_obreros": total_obreros
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(f"❌ Error eliminando reporte de obreros: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Error interno del servidor: {str(e)}"
+        }), 500
+
+def eliminar_reporte_moderadores(reporte_id):
+    """
+    Eliminar reporte de moderadores por ID
+    Elimina tanto el archivo PDF como el registro de la base de datos
+    """
+    try:
+        from bson import ObjectId
+        import os
+        from flask import jsonify
+
+        # Validar que el ID sea un ObjectId válido
+        try:
+            object_id = ObjectId(reporte_id)
+        except Exception:
+            return jsonify({
+                "success": False,
+                "error": "ID de reporte inválido"
+            }), 400
+
+        # Conectar a la base de datos
+        db = get_db()
+        reportes_collection = db.reportes_moderadores
+
+        # Buscar el reporte antes de eliminarlo
+        reporte = reportes_collection.find_one({
+            "_id": object_id,
+            "tipo": "moderadores"
+        })
+
+        if not reporte:
+            return jsonify({
+                "success": False,
+                "error": "Reporte no encontrado"
+            }), 404
+
+        # Obtener información del reporte para logging
+        numero_reporte = reporte.get("numero_reporte", "N/A")
+        total_moderadores = reporte.get("total_moderadores", "N/A")
+        pdf_filename = reporte.get("pdf_filename", "")
+
+        logger.info(f"🗑️ Iniciando eliminación del reporte de moderadores N°{numero_reporte} - {total_moderadores} moderadores")
+
+        # Eliminar archivo PDF si existe
+        if pdf_filename:
+            try:
+                pdf_path = os.path.join("static", "reportes", pdf_filename)
+                if os.path.exists(pdf_path):
+                    os.remove(pdf_path)
+                    logger.info(f"🗑️ Archivo PDF eliminado: {pdf_path}")
+                else:
+                    logger.warning(f"⚠️ Archivo PDF no encontrado: {pdf_path}")
+            except Exception as e:
+                logger.error(f"❌ Error eliminando archivo PDF: {str(e)}")
+                # Continuar con la eliminación de BD aunque falle el archivo
+
+        # Eliminar registro de la base de datos
+        resultado = reportes_collection.delete_one({"_id": object_id})
+
+        if resultado.deleted_count == 0:
+            return jsonify({
+                "success": False,
+                "error": "No se pudo eliminar el reporte de la base de datos"
+            }), 500
+
+        logger.info(f"✅ Reporte de moderadores eliminado exitosamente: N°{numero_reporte} - {total_moderadores} moderadores")
+
+        return jsonify({
+            "success": True,
+            "message": f"Reporte de moderadores N°{numero_reporte} eliminado exitosamente",
+            "reporte_eliminado": {
+                "id": str(object_id),
+                "numero_reporte": numero_reporte,
+                "total_moderadores": total_moderadores
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(f"❌ Error eliminando reporte de moderadores: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Error interno del servidor: {str(e)}"
+        }), 500

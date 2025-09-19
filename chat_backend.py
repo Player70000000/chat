@@ -26,8 +26,8 @@ from funciones.utils_functions import (
     format_date, pagina_inicio, verificar_conexion, api_auth_status, api_channels_list
 )
 from funciones.reports_functions import (
-    generar_reporte_moderadores, listar_reportes_moderadores,
-    generar_reporte_obreros, listar_reportes_obreros,
+    generar_reporte_moderadores, listar_reportes_moderadores, eliminar_reporte_moderadores,
+    generar_reporte_obreros, listar_reportes_obreros, eliminar_reporte_obreros,
     generar_reporte_general, listar_reportes_generales, eliminar_reporte_general
 )
 
@@ -100,6 +100,44 @@ app.route('/api/reports/moderadores/generar', methods=['POST'])(generar_reporte_
 app.route('/api/reports/moderadores/listar', methods=['GET'])(listar_reportes_moderadores)
 app.route('/api/reports/obreros/generar', methods=['POST'])(generar_reporte_obreros)
 app.route('/api/reports/obreros/listar', methods=['GET'])(listar_reportes_obreros)
+
+@app.route('/api/reports/moderadores/<reporte_id>', methods=['DELETE'])
+def api_eliminar_reporte_moderadores(reporte_id):
+    """Endpoint para eliminar reportes de moderadores por ID"""
+    try:
+        if not reporte_id:
+            return jsonify({
+                "success": False,
+                "error": "ID de reporte requerido"
+            }), 400
+
+        return eliminar_reporte_moderadores(reporte_id)
+
+    except Exception as e:
+        logger.error(f"❌ Error en endpoint eliminar reporte moderadores: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Error interno del servidor: {str(e)}"
+        }), 500
+
+@app.route('/api/reports/obreros/<reporte_id>', methods=['DELETE'])
+def api_eliminar_reporte_obreros(reporte_id):
+    """Endpoint para eliminar reportes de obreros por ID"""
+    try:
+        if not reporte_id:
+            return jsonify({
+                "success": False,
+                "error": "ID de reporte requerido"
+            }), 400
+
+        return eliminar_reporte_obreros(reporte_id)
+
+    except Exception as e:
+        logger.error(f"❌ Error en endpoint eliminar reporte obreros: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Error interno del servidor: {str(e)}"
+        }), 500
 
 # Endpoints de reportes generales
 @app.route('/api/reports/generales/generar', methods=['POST'])

@@ -189,7 +189,8 @@ def _crear_pdf_moderadores(pdf_path, moderadores, numero_reporte, fecha_creacion
             rightMargin=72,
             leftMargin=72,
             topMargin=72,
-            bottomMargin=18
+            bottomMargin=18,
+            title="CORPOTACHIRA Reporte"
         )
 
         # Estilos
@@ -489,7 +490,8 @@ def _crear_pdf_obreros(pdf_path, obreros, numero_reporte, fecha_creacion, total_
             rightMargin=72,
             leftMargin=72,
             topMargin=72,
-            bottomMargin=18
+            bottomMargin=18,
+            title="CORPOTACHIRA Reporte"
         )
 
         # Estilos
@@ -919,7 +921,8 @@ def _crear_pdf_general(pdf_path, reporte_data, numero_reporte, fecha_creacion, c
             rightMargin=72,
             leftMargin=72,
             topMargin=72,
-            bottomMargin=18
+            bottomMargin=18,
+            title="CORPOTACHIRA Reporte"
         )
 
         # Estilos

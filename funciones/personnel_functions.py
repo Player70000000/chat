@@ -1140,6 +1140,41 @@ def api_personnel_obreros_delete():
 
         logger.info(f"Obrero encontrado para eliminar: {obrero_existente.get('nombre')} {obrero_existente.get('apellidos')} ({obrero_existente.get('email')})")
 
+        # VALIDACIÓN DE INTEGRIDAD: Verificar si está asignado a cuadrillas activas
+        tiene_cuadrillas, cuadrillas_afectadas, error_validacion = verificar_obrero_en_cuadrillas(cedula)
+
+        if error_validacion:
+            logger.error(f"Error en validación de integridad: {error_validacion}")
+            return jsonify({"error": f"Error validando integridad: {error_validacion}"}), 500
+
+        if tiene_cuadrillas:
+            # El obrero está asignado a cuadrillas activas - BLOQUEAR ELIMINACIÓN
+            cuadrillas_nombres = [c["numero_cuadrilla"] for c in cuadrillas_afectadas]
+            cuadrillas_str = ", ".join(cuadrillas_nombres)
+
+            nombre_completo = f"{obrero_existente.get('nombre')} {obrero_existente.get('apellidos')}"
+
+            mensaje_error = f"No se puede eliminar al obrero '{nombre_completo}' porque está asignado a las siguientes cuadrillas activas:\n\n"
+
+            for cuadrilla in cuadrillas_afectadas:
+                mensaje_error += f"• {cuadrilla['numero_cuadrilla']} - {cuadrilla['actividad']} (Moderador: {cuadrilla['moderador']})\n"
+
+            mensaje_error += f"\n💡 Para eliminar este obrero, primero debe:\n"
+            mensaje_error += f"1. Ir a 'Gestión de Cuadrillas'\n"
+            mensaje_error += f"2. Eliminar las cuadrillas: {cuadrillas_str}\n"
+            mensaje_error += f"3. Luego regresar y eliminar el obrero"
+
+            logger.info(f"Eliminación bloqueada: Obrero {cedula} está en {len(cuadrillas_afectadas)} cuadrillas activas")
+
+            return jsonify({
+                "error": mensaje_error,
+                "tipo_error": "integridad_referencial",
+                "cuadrillas_afectadas": cuadrillas_afectadas,
+                "puede_eliminar": False
+            }), 400
+
+        logger.info(f"Validación de integridad exitosa: Obrero {cedula} no tiene cuadrillas activas")
+
         # Guardar datos del obrero para la respuesta
         obrero_eliminado = {
             "nombre": obrero_existente.get('nombre'),

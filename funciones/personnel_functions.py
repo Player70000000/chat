@@ -604,7 +604,42 @@ def api_personnel_moderadores_delete():
             return jsonify({"error": f"No se encontró moderador con cédula '{cedula}'"}), 404
         
         logger.info(f"Moderador encontrado para eliminar: {moderador_existente.get('nombre')} {moderador_existente.get('apellidos')} ({moderador_existente.get('email')})")
-        
+
+        # VALIDACIÓN DE INTEGRIDAD: Verificar si está asignado a cuadrillas activas
+        tiene_cuadrillas, cuadrillas_afectadas, error_validacion = verificar_moderador_en_cuadrillas(cedula)
+
+        if error_validacion:
+            logger.error(f"Error en validación de integridad: {error_validacion}")
+            return jsonify({"error": f"Error validando integridad: {error_validacion}"}), 500
+
+        if tiene_cuadrillas:
+            # El moderador está asignado a cuadrillas activas - BLOQUEAR ELIMINACIÓN
+            cuadrillas_nombres = [c["numero_cuadrilla"] for c in cuadrillas_afectadas]
+            cuadrillas_str = ", ".join(cuadrillas_nombres)
+
+            nombre_completo = f"{moderador_existente.get('nombre')} {moderador_existente.get('apellidos')}"
+
+            mensaje_error = f"No se puede eliminar al moderador '{nombre_completo}' porque está asignado a las siguientes cuadrillas activas:\n\n"
+
+            for cuadrilla in cuadrillas_afectadas:
+                mensaje_error += f"• {cuadrilla['numero_cuadrilla']} - {cuadrilla['actividad']} ({cuadrilla['numero_obreros']} obreros)\n"
+
+            mensaje_error += f"\n💡 Para eliminar este moderador, primero debe:\n"
+            mensaje_error += f"1. Ir a 'Gestión de Cuadrillas'\n"
+            mensaje_error += f"2. Eliminar las cuadrillas: {cuadrillas_str}\n"
+            mensaje_error += f"3. Luego regresar y eliminar el moderador"
+
+            logger.info(f"Eliminación bloqueada: Moderador {cedula} está en {len(cuadrillas_afectadas)} cuadrillas activas")
+
+            return jsonify({
+                "error": mensaje_error,
+                "tipo_error": "integridad_referencial",
+                "cuadrillas_afectadas": cuadrillas_afectadas,
+                "puede_eliminar": False
+            }), 400
+
+        logger.info(f"Validación de integridad exitosa: Moderador {cedula} no tiene cuadrillas activas")
+
         # Guardar datos del moderador para la respuesta
         moderador_eliminado = {
             "nombre": moderador_existente.get('nombre'),
@@ -1156,3 +1191,94 @@ def api_personnel_obreros_debug():
         })
     except Exception as e:
         return jsonify({"debug_error": str(e)})
+
+
+# ===========================================
+# FUNCIONES DE VALIDACIÓN DE INTEGRIDAD
+# ===========================================
+
+def verificar_moderador_en_cuadrillas(cedula_moderador):
+    """
+    Verificar si un moderador está asignado a cuadrillas activas
+
+    Args:
+        cedula_moderador (str): Cédula del moderador a verificar
+
+    Returns:
+        tuple: (tiene_cuadrillas: bool, cuadrillas_afectadas: list, error: str)
+    """
+    try:
+        db = get_db()
+        if db is None:
+            return False, [], "Base de datos no disponible"
+
+        # Buscar cuadrillas activas que tengan este moderador
+        cuadrillas_con_moderador = list(db.cuadrillas.find({
+            "activo": True,
+            "moderador.cedula": cedula_moderador
+        }))
+
+        if not cuadrillas_con_moderador:
+            logger.info(f"Moderador con cédula {cedula_moderador} no está en cuadrillas activas")
+            return False, [], None
+
+        # Extraer información de las cuadrillas afectadas
+        cuadrillas_info = []
+        for cuadrilla in cuadrillas_con_moderador:
+            cuadrilla_info = {
+                "numero_cuadrilla": cuadrilla.get("numero_cuadrilla", "N/A"),
+                "actividad": cuadrilla.get("actividad", "N/A"),
+                "numero_obreros": len(cuadrilla.get("obreros", []))
+            }
+            cuadrillas_info.append(cuadrilla_info)
+
+        logger.info(f"Moderador con cédula {cedula_moderador} está en {len(cuadrillas_info)} cuadrillas activas")
+        return True, cuadrillas_info, None
+
+    except Exception as e:
+        logger.error(f"Error verificando moderador en cuadrillas: {str(e)}")
+        return False, [], f"Error interno verificando cuadrillas: {str(e)}"
+
+
+def verificar_obrero_en_cuadrillas(cedula_obrero):
+    """
+    Verificar si un obrero está asignado a cuadrillas activas
+
+    Args:
+        cedula_obrero (str): Cédula del obrero a verificar
+
+    Returns:
+        tuple: (tiene_cuadrillas: bool, cuadrillas_afectadas: list, error: str)
+    """
+    try:
+        db = get_db()
+        if db is None:
+            return False, [], "Base de datos no disponible"
+
+        # Buscar cuadrillas activas que tengan este obrero en el array de obreros
+        cuadrillas_con_obrero = list(db.cuadrillas.find({
+            "activo": True,
+            "obreros.cedula": cedula_obrero
+        }))
+
+        if not cuadrillas_con_obrero:
+            logger.info(f"Obrero con cédula {cedula_obrero} no está en cuadrillas activas")
+            return False, [], None
+
+        # Extraer información de las cuadrillas afectadas
+        cuadrillas_info = []
+        for cuadrilla in cuadrillas_con_obrero:
+            cuadrilla_info = {
+                "numero_cuadrilla": cuadrilla.get("numero_cuadrilla", "N/A"),
+                "actividad": cuadrilla.get("actividad", "N/A"),
+                "moderador": cuadrilla.get("moderador", {}).get("nombre", "N/A"),
+                "numero_obreros": len(cuadrilla.get("obreros", []))
+            }
+            cuadrillas_info.append(cuadrilla_info)
+
+        logger.info(f"Obrero con cédula {cedula_obrero} está en {len(cuadrillas_info)} cuadrillas activas")
+        return True, cuadrillas_info, None
+
+    except Exception as e:
+        logger.error(f"Error verificando obrero en cuadrillas: {str(e)}")
+        return False, [], f"Error interno verificando cuadrillas: {str(e)}"

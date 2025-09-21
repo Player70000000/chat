@@ -221,6 +221,47 @@ def api_initialize_system():
             'code': 'INIT_ERROR'
         }), 500
 
+@app.route('/api/auth/debug-admin', methods=['GET'])
+def api_debug_admin():
+    """
+    Endpoint temporal para debuggear usuario admin
+    """
+    try:
+        db = get_db()
+        usuarios_collection = db['usuarios']
+
+        # Buscar usuario admin
+        admin_user = usuarios_collection.find_one({'username': 'admin'})
+
+        if admin_user:
+            # Remover información sensible para el debug
+            admin_debug = {
+                'found': True,
+                'id': str(admin_user.get('_id')),
+                'username': admin_user.get('username'),
+                'tipo_usuario': admin_user.get('tipo_usuario'),
+                'nombre_completo': admin_user.get('nombre_completo'),
+                'cedula': admin_user.get('cedula'),
+                'activo': admin_user.get('activo'),
+                'keys': list(admin_user.keys()),
+                'has_password': 'password' in admin_user,
+                'password_length': len(admin_user.get('password', '')) if admin_user.get('password') else 0
+            }
+        else:
+            admin_debug = {'found': False}
+
+        return jsonify({
+            'success': True,
+            'admin_debug': admin_debug
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'error_type': str(type(e))
+        }), 500
+
 @app.route('/api/auth/verificar-sesion', methods=['GET'])
 @middleware_verificar_autenticacion()
 def api_verificar_sesion():

@@ -166,6 +166,55 @@ def api_login_obrero():
             'code': 'SERVER_ERROR'
         }), 500
 
+@app.route('/api/auth/initialize-system', methods=['POST'])
+def api_initialize_system():
+    """
+    Endpoint temporal para inicializar el sistema de autenticación
+    Crea usuario admin inicial y sincroniza moderadores
+    SOLO PARA SETUP INICIAL - SERÁ REMOVIDO DESPUÉS
+    """
+    try:
+        resultado_inicializacion = {
+            'admin_creado': False,
+            'sync_resultado': None,
+            'errores': []
+        }
+
+        # Verificar si ya existe usuario admin
+        db = get_db()
+        usuarios_collection = db['usuarios']
+
+        admin_existente = usuarios_collection.find_one({'username': 'admin'})
+        if admin_existente:
+            resultado_inicializacion['admin_creado'] = True
+            resultado_inicializacion['mensaje_admin'] = 'Usuario admin ya existía'
+        else:
+            # Crear usuario admin inicial
+            admin_creado = crear_usuario_admin_inicial()
+            resultado_inicializacion['admin_creado'] = admin_creado
+            resultado_inicializacion['mensaje_admin'] = 'Usuario admin creado exitosamente' if admin_creado else 'Error creando admin'
+
+        # Sincronizar moderadores existentes
+        try:
+            sync_result = sincronizar_usuarios_con_personal()
+            resultado_inicializacion['sync_resultado'] = sync_result
+        except Exception as e:
+            resultado_inicializacion['errores'].append(f"Error en sincronización: {str(e)}")
+
+        return jsonify({
+            'success': True,
+            'message': 'Sistema inicializado correctamente',
+            'resultado': resultado_inicializacion
+        }), 200
+
+    except Exception as e:
+        logger.error(f"❌ Error inicializando sistema: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error inicializando sistema: {str(e)}',
+            'code': 'INIT_ERROR'
+        }), 500
+
 @app.route('/api/auth/verificar-sesion', methods=['GET'])
 @middleware_verificar_autenticacion()
 def api_verificar_sesion():

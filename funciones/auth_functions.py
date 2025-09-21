@@ -261,7 +261,12 @@ def login_admin_moderador(username, password):
             return {
                 'success': False,
                 'message': 'Error generando token de sesión',
-                'code': 'TOKEN_ERROR'
+                'code': 'TOKEN_ERROR',
+                'debug_info': {
+                    'usuario_keys': list(usuario.keys()) if usuario else 'usuario_is_none',
+                    'usuario_id': str(usuario.get('_id')) if usuario and usuario.get('_id') else 'no_id',
+                    'usuario_username': usuario.get('username') if usuario else 'no_username'
+                }
             }
 
         return {
@@ -281,10 +286,15 @@ def login_admin_moderador(username, password):
 
     except Exception as e:
         print(f"Error en login admin/moderador: {e}")
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Traceback completo: {error_trace}")
         return {
             'success': False,
             'message': 'Error interno del servidor',
-            'code': 'SERVER_ERROR'
+            'code': 'SERVER_ERROR',
+            'debug_error': str(e),
+            'debug_type': str(type(e))
         }
 
 def login_obrero(cedula):

@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from flask import request, jsonify, current_app
 from bson import ObjectId
-from funciones.database_functions import get_database_connection
+from funciones.database_functions import get_db
 
 # Configuración JWT desde variables de entorno
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'CorpoTachira_Secret_Key_Ultra_Segura_2024_!@#$%^&*()')
@@ -161,7 +161,7 @@ def login_admin_moderador(username, password):
         dict: Resultado del login con token y datos del usuario
     """
     try:
-        db = get_database_connection()
+        db = get_db()
         usuarios_collection = db['usuarios']
 
         # Buscar usuario en BD
@@ -277,7 +277,7 @@ def login_obrero(cedula):
         dict: Resultado del login con token y datos del obrero
     """
     try:
-        db = get_database_connection()
+        db = get_db()
         obreros_collection = db['obreros']
 
         # Buscar SOLO en obreros activos
@@ -341,7 +341,7 @@ def crear_usuario_admin_inicial():
         bool: True si se creó exitosamente, False si ya existía o hubo error
     """
     try:
-        db = get_database_connection()
+        db = get_db()
         usuarios_collection = db['usuarios']
 
         # Verificar si ya existe admin
@@ -394,7 +394,7 @@ def sincronizar_usuarios_con_personal():
         dict: Resultado de la sincronización
     """
     try:
-        db = get_database_connection()
+        db = get_db()
         usuarios_collection = db['usuarios']
         moderadores_collection = db['moderadores']
 
@@ -590,7 +590,7 @@ def verificar_sesion_activa(token):
             }
 
         # Verificar que el usuario sigue activo en BD
-        db = get_database_connection()
+        db = get_db()
 
         if user_data['tipo_usuario'] == 'obrero':
             # Para obreros, verificar en colección obreros
@@ -645,7 +645,7 @@ def cambiar_password(user_id, password_actual, password_nueva):
         dict: Resultado del cambio
     """
     try:
-        db = get_database_connection()
+        db = get_db()
         usuarios_collection = db['usuarios']
 
         # Buscar usuario
@@ -719,7 +719,7 @@ def log_security_event(event_type, user_data, details=None):
         details (dict): Detalles adicionales
     """
     try:
-        db = get_database_connection()
+        db = get_db()
         security_logs = db['security_logs']
 
         log_entry = {
@@ -744,7 +744,7 @@ def limpiar_tokens_expirados():
     Limpia logs de seguridad antiguos y realiza mantenimiento
     """
     try:
-        db = get_database_connection()
+        db = get_db()
 
         # Limpiar logs de seguridad mayores a 30 días
         fecha_limite = datetime.utcnow() - timedelta(days=30)

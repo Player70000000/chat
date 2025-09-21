@@ -19,7 +19,7 @@ from datetime import datetime
 # Agregar path del proyecto para importar funciones
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from funciones.database_functions import get_database_connection
+from funciones.database_functions import get_db
 from funciones.auth_functions import (
     crear_usuario_admin_inicial,
     sincronizar_usuarios_con_personal,
@@ -107,7 +107,7 @@ def configurar_coleccion_usuarios():
     Configura la colección usuarios con índices necesarios
     """
     try:
-        db = get_database_connection()
+        db = get_db()
         usuarios_collection = db['usuarios']
 
         # Crear índices únicos para integridad
@@ -135,7 +135,7 @@ def mostrar_estadisticas():
     Muestra estadísticas del sistema después de la inicialización
     """
     try:
-        db = get_database_connection()
+        db = get_db()
 
         # Contar documentos en cada colección
         stats = {
@@ -170,7 +170,7 @@ def mostrar_credenciales_moderadores():
     Muestra las credenciales generadas para cada moderador
     """
     try:
-        db = get_database_connection()
+        db = get_db()
         moderadores = list(db['moderadores'].find({'activo': True}))
 
         if not moderadores:
@@ -210,7 +210,7 @@ def validar_prerequisitos():
 
     # Verificar conexión a BD
     try:
-        db = get_database_connection()
+        db = get_db()
         # Hacer una consulta simple para verificar conexión
         db.list_collection_names()
         print("   ✅ Conexión a MongoDB Atlas: OK")

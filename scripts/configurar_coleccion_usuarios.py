@@ -16,7 +16,7 @@ from datetime import datetime
 # Agregar path del proyecto para importar funciones
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from funciones.database_functions import get_database_connection
+from funciones.database_functions import get_db
 
 def configurar_coleccion_usuarios():
     """
@@ -25,7 +25,7 @@ def configurar_coleccion_usuarios():
     try:
         print("🔧 Configurando colección 'usuarios' en MongoDB Atlas...")
 
-        db = get_database_connection()
+        db = get_db()
         usuarios_collection = db['usuarios']
 
         # Eliminar índices existentes (excepto _id que es automático)
@@ -104,7 +104,7 @@ def validar_configuracion():
     try:
         print("\n🔍 Validando configuración...")
 
-        db = get_database_connection()
+        db = get_db()
         usuarios_collection = db['usuarios']
 
         # Verificar índices

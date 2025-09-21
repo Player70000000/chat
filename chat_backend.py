@@ -100,11 +100,17 @@ def api_login_admin_moderador():
             # Log evento de seguridad exitoso
             log_security_event('login_success', {
                 'username': username,
-                'tipo_usuario': resultado['user_data']['tipo_usuario']
+                'tipo_usuario': resultado.get('user_data', {}).get('tipo_usuario', 'unknown')
             })
-
-        # Retornar resultado (incluye token si es exitoso)
-        return jsonify(resultado), 200 if resultado['success'] else 401
+            return jsonify(resultado), 200
+        else:
+            # Log evento de seguridad fallido
+            log_security_event('login_failed', {
+                'username': username,
+                'error_code': resultado.get('code', 'UNKNOWN'),
+                'error_message': resultado.get('message', 'Error desconocido')
+            })
+            return jsonify(resultado), 401
 
     except Exception as e:
         logger.error(f"❌ Error en login admin/moderador: {str(e)}")

@@ -107,22 +107,44 @@ def generar_token_jwt(user_data):
         str: Token JWT o None si error
     """
     try:
+        # Debug: imprimir datos del usuario para diagnosticar
+        print(f"🔍 DEBUG generar_token_jwt - user_data: {user_data}")
+
+        # Verificar que user_data no sea None
+        if not user_data:
+            print("❌ ERROR: user_data es None")
+            return None
+
+        # Extraer ID de manera segura
+        user_id = user_data.get('_id')
+        if user_id:
+            user_id_str = str(user_id)
+        else:
+            print("❌ ERROR: user_data no tiene '_id'")
+            return None
+
         payload = {
-            'user_id': str(user_data.get('_id')),
+            'user_id': user_id_str,
             'username': user_data.get('username', ''),
-            'tipo_usuario': user_data.get('tipo_usuario'),
-            'nombre_completo': user_data.get('nombre_completo'),
-            'cedula': user_data.get('cedula'),
+            'tipo_usuario': user_data.get('tipo_usuario', ''),
+            'nombre_completo': user_data.get('nombre_completo', ''),
+            'cedula': user_data.get('cedula', ''),
             'activo': user_data.get('activo', True),
             'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS),
             'iat': datetime.utcnow()
         }
 
+        print(f"🔍 DEBUG payload: {payload}")
+
         token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+        print(f"✅ Token generado exitosamente: {len(token)} caracteres")
         return token
 
     except Exception as e:
-        print(f"Error generando token JWT: {e}")
+        print(f"❌ Error generando token JWT: {e}")
+        print(f"❌ Tipo de error: {type(e)}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
         return None
 
 def verificar_token_jwt(token):

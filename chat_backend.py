@@ -30,6 +30,12 @@ from funciones.reports_functions import (
     generar_reporte_obreros, listar_reportes_obreros, eliminar_reporte_obreros,
     generar_reporte_general, listar_reportes_generales, eliminar_reporte_general
 )
+# NUEVO v8.0: Sistema de Autenticación y Niveles de Acceso
+from funciones.auth_functions import (
+    login_admin_moderador, login_obrero, verificar_sesion_activa, cambiar_password,
+    middleware_verificar_autenticacion, middleware_verificar_permisos,
+    crear_usuario_admin_inicial, sincronizar_usuarios_con_personal, log_security_event
+)
 
 # Configuración básica de logging
 logging.basicConfig(level=logging.INFO)
@@ -60,48 +66,447 @@ app.route('/verificar', methods=['GET'])(verificar_conexion)
 app.route('/api/auth/status', methods=['GET'])(api_auth_status)
 app.route('/api/channels/', methods=['GET'])(api_channels_list)
 
-# Chat routes - gestión de canales y mensajes
-app.route('/crear_canal', methods=['POST'])(crear_canal)
-app.route('/canales', methods=['GET'])(listar_canales)
-app.route('/canal/<nombre>', methods=['GET'])(obtener_canal)
-app.route('/canal/<nombre>', methods=['PUT'])(editar_canal)
-app.route('/canal/<nombre>', methods=['DELETE'])(eliminar_canal)
-app.route('/enviar', methods=['POST'])(enviar_mensaje)
-app.route('/mensajes/<canal>', methods=['GET'])(obtener_mensajes)
-app.route('/mensaje/<mensaje_id>', methods=['PUT'])(editar_mensaje)
-app.route('/mensaje/<mensaje_id>', methods=['DELETE'])(eliminar_mensaje)
-app.route('/mensaje/<mensaje_id>/estado', methods=['PUT'])(actualizar_estado_mensaje)
+# ==================== ENDPOINTS DE AUTENTICACIÓN v8.0 ====================
 
-# Personnel routes - gestión de personal
-app.route('/api/personnel/moderadores/', methods=['GET'])(api_personnel_moderadores)
-app.route('/api/personnel/moderadores/', methods=['POST'])(api_personnel_moderadores_create)
-app.route('/api/personnel/moderadores/', methods=['PUT'])(api_personnel_moderadores_update)
-app.route('/api/personnel/moderadores/', methods=['DELETE'])(api_personnel_moderadores_delete)
-app.route('/api/personnel/moderadores/debug', methods=['GET', 'POST', 'PUT', 'DELETE'])(api_personnel_moderadores_debug)
+@app.route('/api/auth/login/admin-moderador', methods=['POST'])
+def api_login_admin_moderador():
+    """
+    Endpoint para login de Admin y Moderadores
+    Requiere: username y password
+    """
+    try:
+        datos_login = request.get_json()
+        if not datos_login:
+            return jsonify({
+                'success': False,
+                'message': 'No se recibieron datos de login',
+                'code': 'NO_DATA'
+            }), 400
 
-# Obreros routes - gestión de obreros
-app.route('/api/personnel/obreros/', methods=['GET'])(api_personnel_obreros)
-app.route('/api/personnel/obreros/', methods=['POST'])(api_personnel_obreros_create)
-app.route('/api/personnel/obreros/', methods=['PUT'])(api_personnel_obreros_update)
-app.route('/api/personnel/obreros/', methods=['DELETE'])(api_personnel_obreros_delete)
-app.route('/api/personnel/obreros/debug', methods=['GET', 'POST', 'PUT', 'DELETE'])(api_personnel_obreros_debug)
+        username = datos_login.get('username', '').strip()
+        password = datos_login.get('password', '').strip()
 
-# Cuadrillas routes - gestión de cuadrillas
-app.route('/api/personnel/cuadrillas/', methods=['GET'])(get_cuadrillas)
-app.route('/api/personnel/cuadrillas/', methods=['POST'])(create_cuadrilla)
-app.route('/api/personnel/cuadrillas/<cuadrilla_id>', methods=['GET'])(get_cuadrilla_by_id)
-app.route('/api/personnel/cuadrillas/<cuadrilla_id>', methods=['PUT'])(update_cuadrilla)
-app.route('/api/personnel/cuadrillas/<cuadrilla_id>', methods=['DELETE'])(delete_cuadrilla)
-app.route('/api/personnel/cuadrillas/next-number/', methods=['GET'])(get_next_cuadrilla_number_api)
-app.route('/api/personnel/obreros/disponibles/', methods=['GET'])(get_obreros_disponibles)
+        if not username or not password:
+            return jsonify({
+                'success': False,
+                'message': 'Usuario y contraseña son requeridos',
+                'code': 'MISSING_CREDENTIALS'
+            }), 400
 
-# Reports routes - gestión de reportes
-app.route('/api/reports/moderadores/generar', methods=['POST'])(generar_reporte_moderadores)
-app.route('/api/reports/moderadores/listar', methods=['GET'])(listar_reportes_moderadores)
-app.route('/api/reports/obreros/generar', methods=['POST'])(generar_reporte_obreros)
-app.route('/api/reports/obreros/listar', methods=['GET'])(listar_reportes_obreros)
+        # Procesar login
+        resultado = login_admin_moderador(username, password)
+
+        if resultado['success']:
+            # Log evento de seguridad exitoso
+            log_security_event('login_success', {
+                'username': username,
+                'tipo_usuario': resultado['user_data']['tipo_usuario']
+            })
+
+        # Retornar resultado (incluye token si es exitoso)
+        return jsonify(resultado), 200 if resultado['success'] else 401
+
+    except Exception as e:
+        logger.error(f"❌ Error en login admin/moderador: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor',
+            'code': 'SERVER_ERROR'
+        }), 500
+
+@app.route('/api/auth/login/obrero', methods=['POST'])
+def api_login_obrero():
+    """
+    Endpoint para login de Obreros
+    Solo requiere: cedula (sin contraseña)
+    """
+    try:
+        datos_login = request.get_json()
+        if not datos_login:
+            return jsonify({
+                'success': False,
+                'message': 'No se recibieron datos de login',
+                'code': 'NO_DATA'
+            }), 400
+
+        cedula = datos_login.get('cedula', '').strip()
+
+        if not cedula:
+            return jsonify({
+                'success': False,
+                'message': 'Cédula es requerida',
+                'code': 'MISSING_CEDULA'
+            }), 400
+
+        # Validar formato de cédula
+        if not cedula.isdigit() or len(cedula) < 6 or len(cedula) > 10:
+            return jsonify({
+                'success': False,
+                'message': 'Cédula debe tener entre 6 y 10 dígitos',
+                'code': 'INVALID_CEDULA_FORMAT'
+            }), 400
+
+        # Procesar login
+        resultado = login_obrero(cedula)
+
+        if resultado['success']:
+            # Log evento de seguridad exitoso
+            log_security_event('login_success', {
+                'cedula': cedula,
+                'tipo_usuario': 'obrero'
+            })
+
+        return jsonify(resultado), 200 if resultado['success'] else 401
+
+    except Exception as e:
+        logger.error(f"❌ Error en login obrero: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor',
+            'code': 'SERVER_ERROR'
+        }), 500
+
+@app.route('/api/auth/verificar-sesion', methods=['GET'])
+@middleware_verificar_autenticacion()
+def api_verificar_sesion():
+    """
+    Endpoint para verificar si la sesión actual es válida
+    Requiere token JWT en header Authorization
+    """
+    try:
+        # El middleware ya verificó el token, user_data está disponible
+        user_data = request.user_data
+
+        return jsonify({
+            'success': True,
+            'message': 'Sesión válida',
+            'user_data': {
+                'id': user_data.get('user_id'),
+                'username': user_data.get('username'),
+                'tipo_usuario': user_data.get('tipo_usuario'),
+                'nombre_completo': user_data.get('nombre_completo'),
+                'cedula': user_data.get('cedula'),
+                'activo': user_data.get('activo')
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(f"❌ Error verificando sesión: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Error verificando sesión',
+            'code': 'SESSION_ERROR'
+        }), 500
+
+@app.route('/api/auth/logout', methods=['POST'])
+@middleware_verificar_autenticacion()
+def api_logout():
+    """
+    Endpoint para cerrar sesión
+    Invalida el token actual y registra el evento
+    """
+    try:
+        user_data = request.user_data
+
+        # Log evento de logout
+        log_security_event('logout', {
+            'user_id': user_data.get('user_id'),
+            'username': user_data.get('username'),
+            'tipo_usuario': user_data.get('tipo_usuario')
+        })
+
+        return jsonify({
+            'success': True,
+            'message': 'Sesión cerrada exitosamente'
+        }), 200
+
+    except Exception as e:
+        logger.error(f"❌ Error en logout: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Error cerrando sesión',
+            'code': 'LOGOUT_ERROR'
+        }), 500
+
+@app.route('/api/auth/cambiar-password', methods=['POST'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def api_cambiar_password():
+    """
+    Endpoint para cambiar contraseña
+    Solo para admin y moderadores (obreros no tienen contraseña)
+    """
+    try:
+        user_data = request.user_data
+        datos_cambio = request.get_json()
+
+        if not datos_cambio:
+            return jsonify({
+                'success': False,
+                'message': 'No se recibieron datos',
+                'code': 'NO_DATA'
+            }), 400
+
+        password_actual = datos_cambio.get('password_actual', '').strip()
+        password_nueva = datos_cambio.get('password_nueva', '').strip()
+
+        if not password_actual or not password_nueva:
+            return jsonify({
+                'success': False,
+                'message': 'Contraseña actual y nueva son requeridas',
+                'code': 'MISSING_PASSWORDS'
+            }), 400
+
+        # Procesar cambio de contraseña
+        resultado = cambiar_password(
+            user_data['user_id'],
+            password_actual,
+            password_nueva
+        )
+
+        if resultado['success']:
+            # Log evento de seguridad
+            log_security_event('password_change', {
+                'user_id': user_data['user_id'],
+                'username': user_data.get('username')
+            })
+
+        return jsonify(resultado), 200 if resultado['success'] else 400
+
+    except Exception as e:
+        logger.error(f"❌ Error cambiando contraseña: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Error interno del servidor',
+            'code': 'SERVER_ERROR'
+        }), 500
+
+@app.route('/api/auth/inicializar-sistema', methods=['POST'])
+def api_inicializar_sistema():
+    """
+    Endpoint para inicializar el sistema de autenticación
+    Crea admin inicial y sincroniza moderadores
+    SOLO SE USA UNA VEZ AL INSTALAR
+    """
+    try:
+        # Crear admin inicial
+        admin_creado = crear_usuario_admin_inicial()
+
+        # Sincronizar moderadores
+        sync_result = sincronizar_usuarios_con_personal()
+
+        return jsonify({
+            'success': True,
+            'message': 'Sistema de autenticación inicializado',
+            'admin_creado': admin_creado,
+            'sincronizacion': sync_result
+        }), 200
+
+    except Exception as e:
+        logger.error(f"❌ Error inicializando sistema: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Error inicializando sistema de autenticación',
+            'code': 'INIT_ERROR'
+        }), 500
+
+# Chat routes - gestión de canales y mensajes CON AUTENTICACIÓN v8.0
+# Obreros pueden LEER, Admin/Moderador pueden TODO
+
+@app.route('/crear_canal', methods=['POST'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_crear_canal():
+    return crear_canal()
+
+@app.route('/canales', methods=['GET'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador', 'obrero'])
+def secured_listar_canales():
+    return listar_canales()
+
+@app.route('/canal/<nombre>', methods=['GET'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador', 'obrero'])
+def secured_obtener_canal(nombre):
+    return obtener_canal(nombre)
+
+@app.route('/canal/<nombre>', methods=['PUT'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_editar_canal(nombre):
+    return editar_canal(nombre)
+
+@app.route('/canal/<nombre>', methods=['DELETE'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_eliminar_canal(nombre):
+    return eliminar_canal(nombre)
+
+@app.route('/enviar', methods=['POST'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_enviar_mensaje():
+    return enviar_mensaje()
+
+@app.route('/mensajes/<canal>', methods=['GET'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador', 'obrero'])
+def secured_obtener_mensajes(canal):
+    return obtener_mensajes(canal)
+
+@app.route('/mensaje/<mensaje_id>', methods=['PUT'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_editar_mensaje(mensaje_id):
+    return editar_mensaje(mensaje_id)
+
+@app.route('/mensaje/<mensaje_id>', methods=['DELETE'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_eliminar_mensaje(mensaje_id):
+    return eliminar_mensaje(mensaje_id)
+
+@app.route('/mensaje/<mensaje_id>/estado', methods=['PUT'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_actualizar_estado_mensaje(mensaje_id):
+    return actualizar_estado_mensaje(mensaje_id)
+
+# Personnel routes - gestión de personal CON AUTENTICACIÓN v8.0
+# Moderadores - Solo ADMIN puede gestionar moderadores
+@app.route('/api/personnel/moderadores/', methods=['GET'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin'])
+def secured_api_personnel_moderadores():
+    return api_personnel_moderadores()
+
+@app.route('/api/personnel/moderadores/', methods=['POST'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin'])
+def secured_api_personnel_moderadores_create():
+    return api_personnel_moderadores_create()
+
+@app.route('/api/personnel/moderadores/', methods=['PUT'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin'])
+def secured_api_personnel_moderadores_update():
+    return api_personnel_moderadores_update()
+
+@app.route('/api/personnel/moderadores/', methods=['DELETE'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin'])
+def secured_api_personnel_moderadores_delete():
+    return api_personnel_moderadores_delete()
+
+@app.route('/api/personnel/moderadores/debug', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin'])
+def secured_api_personnel_moderadores_debug():
+    return api_personnel_moderadores_debug()
+
+# Obreros routes - gestión de obreros (Admin + Moderador)
+@app.route('/api/personnel/obreros/', methods=['GET'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_api_personnel_obreros():
+    return api_personnel_obreros()
+
+@app.route('/api/personnel/obreros/', methods=['POST'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_api_personnel_obreros_create():
+    return api_personnel_obreros_create()
+
+@app.route('/api/personnel/obreros/', methods=['PUT'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_api_personnel_obreros_update():
+    return api_personnel_obreros_update()
+
+@app.route('/api/personnel/obreros/', methods=['DELETE'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_api_personnel_obreros_delete():
+    return api_personnel_obreros_delete()
+
+@app.route('/api/personnel/obreros/debug', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_api_personnel_obreros_debug():
+    return api_personnel_obreros_debug()
+
+# Cuadrillas routes - gestión de cuadrillas (Admin + Moderador)
+@app.route('/api/personnel/cuadrillas/', methods=['GET'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_get_cuadrillas():
+    return get_cuadrillas()
+
+@app.route('/api/personnel/cuadrillas/', methods=['POST'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_create_cuadrilla():
+    return create_cuadrilla()
+
+@app.route('/api/personnel/cuadrillas/<cuadrilla_id>', methods=['GET'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_get_cuadrilla_by_id(cuadrilla_id):
+    return get_cuadrilla_by_id(cuadrilla_id)
+
+@app.route('/api/personnel/cuadrillas/<cuadrilla_id>', methods=['PUT'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_update_cuadrilla(cuadrilla_id):
+    return update_cuadrilla(cuadrilla_id)
+
+@app.route('/api/personnel/cuadrillas/<cuadrilla_id>', methods=['DELETE'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_delete_cuadrilla(cuadrilla_id):
+    return delete_cuadrilla(cuadrilla_id)
+
+@app.route('/api/personnel/cuadrillas/next-number/', methods=['GET'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_get_next_cuadrilla_number_api():
+    return get_next_cuadrilla_number_api()
+
+@app.route('/api/personnel/obreros/disponibles/', methods=['GET'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_get_obreros_disponibles():
+    return get_obreros_disponibles()
+
+# Reports routes - gestión de reportes (Admin + Moderador)
+@app.route('/api/reports/moderadores/generar', methods=['POST'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_generar_reporte_moderadores():
+    return generar_reporte_moderadores()
+
+@app.route('/api/reports/moderadores/listar', methods=['GET'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_listar_reportes_moderadores():
+    return listar_reportes_moderadores()
+
+@app.route('/api/reports/obreros/generar', methods=['POST'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_generar_reporte_obreros():
+    return generar_reporte_obreros()
+
+@app.route('/api/reports/obreros/listar', methods=['GET'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_listar_reportes_obreros():
+    return listar_reportes_obreros()
 
 @app.route('/api/reports/moderadores/<reporte_id>', methods=['DELETE'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
 def api_eliminar_reporte_moderadores(reporte_id):
     """Endpoint para eliminar reportes de moderadores por ID"""
     try:
@@ -121,6 +526,8 @@ def api_eliminar_reporte_moderadores(reporte_id):
         }), 500
 
 @app.route('/api/reports/obreros/<reporte_id>', methods=['DELETE'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
 def api_eliminar_reporte_obreros(reporte_id):
     """Endpoint para eliminar reportes de obreros por ID"""
     try:
@@ -139,8 +546,10 @@ def api_eliminar_reporte_obreros(reporte_id):
             "error": f"Error interno del servidor: {str(e)}"
         }), 500
 
-# Endpoints de reportes generales
+# Endpoints de reportes generales (Admin + Moderador)
 @app.route('/api/reports/generales/generar', methods=['POST'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
 def api_generar_reporte_general():
     """Endpoint para generar reportes generales de cuadrillas"""
     try:
@@ -160,9 +569,15 @@ def api_generar_reporte_general():
             "error": f"Error interno del servidor: {str(e)}"
         }), 500
 
-app.route('/api/reports/generales/listar', methods=['GET'])(listar_reportes_generales)
+@app.route('/api/reports/generales/listar', methods=['GET'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_listar_reportes_generales():
+    return listar_reportes_generales()
 
 @app.route('/api/reports/generales/<reporte_id>', methods=['DELETE'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
 def api_eliminar_reporte_general(reporte_id):
     """Endpoint para eliminar reportes generales por ID"""
     try:

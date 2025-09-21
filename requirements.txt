@@ -5,3 +5,7 @@ python-dotenv==1.0.0
 gunicorn==21.2.0
 reportlab==4.0.7
 python-dateutil==2.8.2
+
+# Dependencias de Autenticación v8.0
+bcrypt==4.1.2
+PyJWT==2.8.0

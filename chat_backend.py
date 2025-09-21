@@ -262,6 +262,66 @@ def api_debug_admin():
             'error_type': str(type(e))
         }), 500
 
+@app.route('/api/auth/test-password', methods=['POST'])
+def api_test_password():
+    """
+    Endpoint temporal para probar verificación de contraseña y JWT
+    """
+    try:
+        from funciones.auth_functions import verificar_password, generar_token_jwt
+
+        datos = request.get_json() or {}
+        password = datos.get('password', '')
+
+        db = get_db()
+        usuarios_collection = db['usuarios']
+        admin_user = usuarios_collection.find_one({'username': 'admin'})
+
+        if not admin_user:
+            return jsonify({'success': False, 'error': 'Admin not found'}), 404
+
+        # Test 1: Verificar contraseña
+        stored_password = admin_user.get('password', '')
+        password_valid = verificar_password(password, stored_password)
+
+        result = {
+            'password_test': {
+                'provided_password_length': len(password),
+                'stored_password_length': len(stored_password),
+                'password_valid': password_valid
+            }
+        }
+
+        # Test 2: Solo si la contraseña es válida, probar JWT
+        if password_valid:
+            try:
+                token = generar_token_jwt(admin_user)
+                result['jwt_test'] = {
+                    'token_generated': token is not None,
+                    'token_length': len(token) if token else 0
+                }
+                if not token:
+                    result['jwt_test']['error'] = 'Token generation returned None'
+            except Exception as jwt_e:
+                result['jwt_test'] = {
+                    'error': str(jwt_e),
+                    'error_type': str(type(jwt_e))
+                }
+
+        return jsonify({
+            'success': True,
+            'test_results': result
+        }), 200
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'error_type': str(type(e)),
+            'traceback': traceback.format_exc()
+        }), 500
+
 @app.route('/api/auth/verificar-sesion', methods=['GET'])
 @middleware_verificar_autenticacion()
 def api_verificar_sesion():

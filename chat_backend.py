@@ -322,6 +322,47 @@ def api_test_password():
             'traceback': traceback.format_exc()
         }), 500
 
+@app.route('/api/auth/fix-admin-password', methods=['POST'])
+def api_fix_admin_password():
+    """
+    Endpoint temporal para cambiar contraseña admin a una sin caracteres especiales problemáticos
+    """
+    try:
+        from funciones.auth_functions import hash_password
+
+        # Nueva contraseña sin caracteres que causen problemas JSON
+        nueva_password = "CorpoTachira2024Admin"
+
+        db = get_db()
+        usuarios_collection = db['usuarios']
+
+        # Hashear nueva contraseña
+        hashed_password = hash_password(nueva_password)
+        if not hashed_password:
+            return jsonify({'success': False, 'error': 'Error hasheando contraseña'}), 500
+
+        # Actualizar contraseña del admin
+        result = usuarios_collection.update_one(
+            {'username': 'admin'},
+            {'$set': {'password': hashed_password}}
+        )
+
+        return jsonify({
+            'success': True,
+            'message': 'Contraseña admin actualizada',
+            'nueva_password': nueva_password,
+            'matched_count': result.matched_count,
+            'modified_count': result.modified_count
+        }), 200
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
 @app.route('/api/auth/verificar-sesion', methods=['GET'])
 @middleware_verificar_autenticacion()
 def api_verificar_sesion():

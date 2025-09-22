@@ -11,6 +11,111 @@ from funciones.database_functions import get_db
 # Logger para este módulo
 logger = logging.getLogger(__name__)
 
+def api_personnel_check_duplicates():
+    """
+    Endpoint para verificar duplicados de cédula, email y teléfono
+    Usado por el frontend para validar en tiempo real
+    """
+    try:
+        db = get_db()
+
+        # Obtener parámetros de la consulta
+        cedula = request.args.get('cedula', '').strip()
+        email = request.args.get('email', '').strip()
+        telefono = request.args.get('telefono', '').strip()
+        exclude_id = request.args.get('exclude_id', '').strip()  # Para edición
+
+        duplicados = {
+            'cedula': False,
+            'email': False,
+            'telefono': False,
+            'detalles': {}
+        }
+
+        # Verificar cédula
+        if cedula:
+            query = {"cedula": cedula}
+            if exclude_id:
+                query["_id"] = {"$ne": exclude_id}
+
+            # Buscar en moderadores
+            moderador_cedula = db.moderadores.find_one(query)
+            if moderador_cedula:
+                duplicados['cedula'] = True
+                duplicados['detalles']['cedula'] = {
+                    'tipo': 'moderador',
+                    'nombre': f"{moderador_cedula.get('nombre', '')} {moderador_cedula.get('apellidos', '')}"
+                }
+            else:
+                # Buscar en obreros
+                obrero_cedula = db.obreros.find_one(query)
+                if obrero_cedula:
+                    duplicados['cedula'] = True
+                    duplicados['detalles']['cedula'] = {
+                        'tipo': 'obrero',
+                        'nombre': f"{obrero_cedula.get('nombre', '')} {obrero_cedula.get('apellidos', '')}"
+                    }
+
+        # Verificar email
+        if email:
+            query = {"email": email}
+            if exclude_id:
+                query["_id"] = {"$ne": exclude_id}
+
+            # Buscar en moderadores
+            moderador_email = db.moderadores.find_one(query)
+            if moderador_email:
+                duplicados['email'] = True
+                duplicados['detalles']['email'] = {
+                    'tipo': 'moderador',
+                    'nombre': f"{moderador_email.get('nombre', '')} {moderador_email.get('apellidos', '')}"
+                }
+            else:
+                # Buscar en obreros
+                obrero_email = db.obreros.find_one(query)
+                if obrero_email:
+                    duplicados['email'] = True
+                    duplicados['detalles']['email'] = {
+                        'tipo': 'obrero',
+                        'nombre': f"{obrero_email.get('nombre', '')} {obrero_email.get('apellidos', '')}"
+                    }
+
+        # Verificar teléfono
+        if telefono:
+            query = {"telefono": telefono}
+            if exclude_id:
+                query["_id"] = {"$ne": exclude_id}
+
+            # Buscar en moderadores
+            moderador_telefono = db.moderadores.find_one(query)
+            if moderador_telefono:
+                duplicados['telefono'] = True
+                duplicados['detalles']['telefono'] = {
+                    'tipo': 'moderador',
+                    'nombre': f"{moderador_telefono.get('nombre', '')} {moderador_telefono.get('apellidos', '')}"
+                }
+            else:
+                # Buscar en obreros
+                obrero_telefono = db.obreros.find_one(query)
+                if obrero_telefono:
+                    duplicados['telefono'] = True
+                    duplicados['detalles']['telefono'] = {
+                        'tipo': 'obrero',
+                        'nombre': f"{obrero_telefono.get('nombre', '')} {obrero_telefono.get('apellidos', '')}"
+                    }
+
+        return jsonify({
+            "success": True,
+            "duplicados": duplicados
+        }), 200
+
+    except Exception as e:
+        logger.error(f"❌ Error verificando duplicados: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Error verificando duplicados: {str(e)}"
+        }), 500
+
 def get_venezuela_time():
     """Obtener la hora actual de Venezuela (GMT-4)"""
     # Venezuela está en GMT-4 (4 horas atrás de UTC)

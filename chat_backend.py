@@ -14,7 +14,7 @@ load_dotenv()
 
 # NUEVO: Importar funciones modulares
 from funciones.database_functions import init_db, get_db_status, get_db, get_client
-from funciones.personnel_functions import api_personnel_moderadores, api_personnel_moderadores_create, api_personnel_moderadores_update, api_personnel_moderadores_delete, api_personnel_moderadores_debug, api_personnel_obreros, api_personnel_obreros_create, api_personnel_obreros_update, api_personnel_obreros_delete, api_personnel_obreros_debug
+from funciones.personnel_functions import api_personnel_moderadores, api_personnel_moderadores_create, api_personnel_moderadores_update, api_personnel_moderadores_delete, api_personnel_moderadores_debug, api_personnel_obreros, api_personnel_obreros_create, api_personnel_obreros_update, api_personnel_obreros_delete, api_personnel_obreros_debug, api_personnel_check_duplicates
 from funciones.cuadrilla_functions import (
     create_cuadrilla, get_cuadrillas, get_cuadrilla_by_id, update_cuadrilla, delete_cuadrilla, get_next_cuadrilla_number_api, get_obreros_disponibles
 )
@@ -601,6 +601,13 @@ def secured_api_personnel_moderadores_delete():
 @middleware_verificar_permisos(['admin'])
 def secured_api_personnel_moderadores_debug():
     return api_personnel_moderadores_debug()
+
+# Check duplicates route - validación de duplicados (Admin + Moderador)
+@app.route('/api/personnel/check-duplicates/', methods=['GET'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['admin', 'moderador'])
+def secured_api_personnel_check_duplicates():
+    return api_personnel_check_duplicates()
 
 # Obreros routes - gestión de obreros (Admin + Moderador)
 @app.route('/api/personnel/obreros/', methods=['GET'])

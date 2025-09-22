@@ -571,10 +571,10 @@ def secured_actualizar_estado_mensaje(mensaje_id):
     return actualizar_estado_mensaje(mensaje_id)
 
 # Personnel routes - gestión de personal CON AUTENTICACIÓN v8.0
-# Moderadores - Solo ADMIN puede gestionar moderadores
+# Moderadores - GET permite admin+moderador (para cuadrillas), resto solo admin
 @app.route('/api/personnel/moderadores/', methods=['GET'])
 @middleware_verificar_autenticacion()
-@middleware_verificar_permisos(['admin'])
+@middleware_verificar_permisos(['admin', 'moderador'])
 def secured_api_personnel_moderadores():
     return api_personnel_moderadores()
 

@@ -6,6 +6,7 @@ Maneja todas las operaciones relacionadas con moderadores y personal
 import logging
 from datetime import datetime, timezone, timedelta
 from flask import request, jsonify
+from bson import ObjectId
 from funciones.database_functions import get_db
 
 # Logger para este módulo
@@ -23,7 +24,17 @@ def api_personnel_check_duplicates():
         cedula = request.args.get('cedula', '').strip()
         email = request.args.get('email', '').strip()
         telefono = request.args.get('telefono', '').strip()
-        exclude_id = request.args.get('exclude_id', '').strip()  # Para edición
+        exclude_id_str = request.args.get('exclude_id', '').strip()  # Para edición
+
+        # Convertir exclude_id a ObjectId si existe
+        exclude_id = None
+        if exclude_id_str:
+            try:
+                exclude_id = ObjectId(exclude_id_str)
+                logger.info(f"🔄 DEBUG: exclude_id convertido: {exclude_id_str} → {exclude_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ DEBUG: exclude_id inválido: {exclude_id_str} - {e}")
+                exclude_id = None
 
         duplicados = {
             'cedula': False,

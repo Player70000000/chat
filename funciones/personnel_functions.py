@@ -448,10 +448,75 @@ def api_personnel_moderadores_create():
         logger.info(f"🆔 CEDULA GUARDADA EN DB: '{cedula_guardada}' (tipo: {type(cedula_guardada)})")
         
         logger.info(f"Moderador creado: {nombre} ({email})")
-        
+
+        # NUEVO: Crear automáticamente usuario correspondiente para el moderador
+        try:
+            from funciones.auth_functions import generar_credenciales_moderador, hash_password
+
+            # Generar credenciales automáticas
+            usuario, contraseña = generar_credenciales_moderador(nombre, apellidos, cedula_valida)
+
+            if usuario and contraseña:
+                # Hashear contraseña
+                password_hash = hash_password(contraseña)
+
+                if password_hash:
+                    # Crear entrada en colección usuarios
+                    usuario_data = {
+                        'tipo_usuario': 'moderador',
+                        'username': usuario,
+                        'password': password_hash,
+                        'nombre_completo': f"{nombre} {apellidos}",
+                        'cedula': cedula_valida,
+                        'email': email,
+                        'personal_id': resultado.inserted_id,
+                        'activo': True,
+                        'fecha_creacion': get_venezuela_time(),
+                        'ultimo_acceso': None,
+                        'intentos_fallidos': 0
+                    }
+
+                    resultado_usuario = db.usuarios.insert_one(usuario_data)
+
+                    if resultado_usuario.inserted_id:
+                        logger.info(f"✅ Usuario creado automáticamente para moderador {nombre}: Usuario={usuario}, Contraseña={contraseña}")
+
+                        return jsonify({
+                            "success": True,
+                            "message": "Moderador registrado exitosamente con credenciales automáticas",
+                            "moderador_id": str(resultado.inserted_id),
+                            "credenciales": {
+                                "usuario": usuario,
+                                "contraseña": contraseña
+                            },
+                            "data": {
+                                "nombre": nombre,
+                                "apellidos": apellidos,
+                                "cedula": cedula_valida,
+                                "email": email,
+                                "telefono": telefono,
+                                "talla_ropa": talla_ropa,
+                                "talla_zapatos": talla_zapatos,
+                                "activo": documento_moderador["activo"],
+                                "nivel": documento_moderador["nivel"],
+                                "fecha_creacion": documento_moderador["fecha_creacion"],
+                                "creado_por": documento_moderador["creado_por"]
+                            }
+                        }), 201
+                    else:
+                        logger.warning(f"⚠️ Error creando usuario para moderador {nombre}")
+                else:
+                    logger.warning(f"⚠️ Error hasheando contraseña para moderador {nombre}")
+            else:
+                logger.warning(f"⚠️ Error generando credenciales para moderador {nombre}")
+        except Exception as e:
+            logger.error(f"❌ Error creando usuario automático para moderador {nombre}: {e}")
+
+        # Si llegamos aquí, el moderador se creó pero hubo error con el usuario
+        # Devolver respuesta normal pero avisar del problema
         return jsonify({
             "success": True,
-            "message": "Moderador registrado exitosamente",
+            "message": "Moderador registrado exitosamente (credenciales pendientes - contactar admin)",
             "moderador_id": str(resultado.inserted_id),
             "data": {
                 "nombre": nombre,
@@ -647,7 +712,75 @@ def api_personnel_moderadores_update():
                 return jsonify({"error": "No se encontró el moderador para actualizar"}), 404
         
         logger.info(f"Moderador actualizado exitosamente: {nombre} ({email})")
-        
+
+        # NUEVO: Actualizar usuario correspondiente si existe, o crearlo si no existe
+        try:
+            # Buscar usuario existente por personal_id
+            usuario_existente = db.usuarios.find_one({"personal_id": moderador_existente["_id"]})
+
+            if usuario_existente:
+                # Actualizar usuario existente
+                update_data_usuario = {
+                    'nombre_completo': f"{nombre} {apellidos}",
+                    'cedula': cedula_valida,
+                    'email': email,
+                    'activo': documento_actualizado["activo"]
+                }
+
+                # Si la cédula cambió, regenerar credenciales
+                if cedula_valida != cedula_original:
+                    from funciones.auth_functions import generar_credenciales_moderador, hash_password
+                    nuevo_usuario, nueva_contraseña = generar_credenciales_moderador(nombre, apellidos, cedula_valida)
+
+                    if nuevo_usuario and nueva_contraseña:
+                        nuevo_password_hash = hash_password(nueva_contraseña)
+                        if nuevo_password_hash:
+                            update_data_usuario['username'] = nuevo_usuario
+                            update_data_usuario['password'] = nuevo_password_hash
+                            logger.info(f"✅ Credenciales actualizadas para moderador {nombre}: Usuario={nuevo_usuario}, Contraseña={nueva_contraseña}")
+
+                resultado_update_usuario = db.usuarios.update_one(
+                    {"personal_id": moderador_existente["_id"]},
+                    {"$set": update_data_usuario}
+                )
+
+                if resultado_update_usuario.modified_count > 0:
+                    logger.info(f"✅ Usuario actualizado automáticamente para moderador {nombre}")
+                else:
+                    logger.info(f"ℹ️ Usuario no requería actualizaciones para moderador {nombre}")
+
+            else:
+                # Usuario no existe, crearlo
+                from funciones.auth_functions import generar_credenciales_moderador, hash_password
+
+                usuario, contraseña = generar_credenciales_moderador(nombre, apellidos, cedula_valida)
+
+                if usuario and contraseña:
+                    password_hash = hash_password(contraseña)
+
+                    if password_hash:
+                        usuario_data = {
+                            'tipo_usuario': 'moderador',
+                            'username': usuario,
+                            'password': password_hash,
+                            'nombre_completo': f"{nombre} {apellidos}",
+                            'cedula': cedula_valida,
+                            'email': email,
+                            'personal_id': moderador_existente["_id"],
+                            'activo': True,
+                            'fecha_creacion': get_venezuela_time(),
+                            'ultimo_acceso': None,
+                            'intentos_fallidos': 0
+                        }
+
+                        resultado_nuevo_usuario = db.usuarios.insert_one(usuario_data)
+
+                        if resultado_nuevo_usuario.inserted_id:
+                            logger.info(f"✅ Usuario creado automáticamente para moderador actualizado {nombre}: Usuario={usuario}, Contraseña={contraseña}")
+
+        except Exception as e:
+            logger.error(f"❌ Error sincronizando usuario para moderador actualizado {nombre}: {e}")
+
         # Obtener documento actualizado para respuesta
         moderador_actualizado = db.moderadores.find_one({"cedula": cedula_valida}, {"_id": 0})
         
@@ -770,11 +903,21 @@ def api_personnel_moderadores_delete():
         
         # Eliminar de base de datos
         resultado = db.moderadores.delete_one({"cedula": cedula})
-        
+
         if resultado.deleted_count == 0:
             logger.warning("No se eliminó ningún documento")
             return jsonify({"error": "No se pudo eliminar el moderador"}), 500
-        
+
+        # NUEVO: Eliminar también el usuario correspondiente si existe
+        try:
+            resultado_usuario = db.usuarios.delete_one({"personal_id": moderador_existente["_id"]})
+            if resultado_usuario.deleted_count > 0:
+                logger.info(f"✅ Usuario eliminado automáticamente para moderador {moderador_eliminado['nombre']} {moderador_eliminado['apellidos']}")
+            else:
+                logger.info(f"ℹ️ No se encontró usuario asociado para eliminar del moderador {moderador_eliminado['nombre']} {moderador_eliminado['apellidos']}")
+        except Exception as e:
+            logger.error(f"❌ Error eliminando usuario asociado al moderador {moderador_eliminado['nombre']} {moderador_eliminado['apellidos']}: {e}")
+
         logger.info(f"Moderador eliminado exitosamente: {moderador_eliminado['nombre']} {moderador_eliminado['apellidos']}")
         
         return jsonify({

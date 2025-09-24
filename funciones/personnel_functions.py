@@ -1596,7 +1596,7 @@ def api_personnel_mi_informacion():
             return jsonify({"error": "Token inválido o expirado"}), 401
 
         # Solo obreros pueden usar este endpoint
-        if user_data.get('nivel') != 'obrero':
+        if user_data.get('tipo_usuario') != 'obrero':
             return jsonify({"error": "Acceso denegado. Solo para obreros"}), 403
 
         cedula_obrero = user_data.get('cedula')
@@ -1649,7 +1649,7 @@ def api_personnel_mi_cuadrilla():
             return jsonify({"error": "Token inválido o expirado"}), 401
 
         # Solo obreros pueden usar este endpoint
-        if user_data.get('nivel') != 'obrero':
+        if user_data.get('tipo_usuario') != 'obrero':
             return jsonify({"error": "Acceso denegado. Solo para obreros"}), 403
 
         cedula_obrero = user_data.get('cedula')

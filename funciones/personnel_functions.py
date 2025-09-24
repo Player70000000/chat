@@ -1520,10 +1520,23 @@ def verificar_moderador_en_cuadrillas(cedula_moderador):
         # Extraer información de las cuadrillas afectadas
         cuadrillas_info = []
         for cuadrilla in cuadrillas_con_moderador:
+            # Validar que cuadrilla sea un diccionario
+            if not isinstance(cuadrilla, dict):
+                logger.warning(f"cuadrilla es de tipo {type(cuadrilla)}, esperaba dict. Valor: {cuadrilla}")
+                continue
+
+            # Validar campo obreros
+            obreros_data = cuadrilla.get("obreros", [])
+            if not isinstance(obreros_data, list):
+                logger.warning(f"obreros_data es de tipo {type(obreros_data)}, esperaba list. Valor: {obreros_data}")
+                numero_obreros = 0
+            else:
+                numero_obreros = len(obreros_data)
+
             cuadrilla_info = {
                 "numero_cuadrilla": cuadrilla.get("numero_cuadrilla", "N/A"),
                 "actividad": cuadrilla.get("actividad", "N/A"),
-                "numero_obreros": len(cuadrilla.get("obreros", []))
+                "numero_obreros": numero_obreros
             }
             cuadrillas_info.append(cuadrilla_info)
 
@@ -1563,20 +1576,39 @@ def verificar_obrero_en_cuadrillas(cedula_obrero):
         # Extraer información de las cuadrillas afectadas
         cuadrillas_info = []
         for cuadrilla in cuadrillas_con_obrero:
-            # Obtener información completa del moderador
-            moderador_data = cuadrilla.get("moderador", {})
-            moderador_nombre = moderador_data.get("nombre", "")
-            moderador_apellidos = moderador_data.get("apellidos", "")
-            moderador_completo = f"{moderador_nombre} {moderador_apellidos}".strip()
+            # Validar que cuadrilla sea un diccionario
+            if not isinstance(cuadrilla, dict):
+                logger.warning(f"cuadrilla es de tipo {type(cuadrilla)}, esperaba dict. Valor: {cuadrilla}")
+                continue
 
-            if not moderador_completo:
-                moderador_completo = "N/A"
+            # Obtener información completa del moderador con validación de tipos
+            moderador_data = cuadrilla.get("moderador", {})
+
+            # Validar que moderador_data sea un diccionario
+            if not isinstance(moderador_data, dict):
+                logger.warning(f"moderador_data es de tipo {type(moderador_data)}, esperaba dict. Valor: {moderador_data}")
+                moderador_completo = "Moderador no válido"
+            else:
+                moderador_nombre = moderador_data.get("nombre", "")
+                moderador_apellidos = moderador_data.get("apellidos", "")
+                moderador_completo = f"{moderador_nombre} {moderador_apellidos}".strip()
+
+                if not moderador_completo:
+                    moderador_completo = "N/A"
+
+            # Validar otros campos de la cuadrilla
+            obreros_data = cuadrilla.get("obreros", [])
+            if not isinstance(obreros_data, list):
+                logger.warning(f"obreros_data es de tipo {type(obreros_data)}, esperaba list. Valor: {obreros_data}")
+                numero_obreros = 0
+            else:
+                numero_obreros = len(obreros_data)
 
             cuadrilla_info = {
                 "numero_cuadrilla": cuadrilla.get("numero_cuadrilla", "N/A"),
                 "actividad": cuadrilla.get("actividad", "N/A"),
                 "moderador": moderador_completo,
-                "numero_obreros": len(cuadrilla.get("obreros", []))
+                "numero_obreros": numero_obreros
             }
             cuadrillas_info.append(cuadrilla_info)
 

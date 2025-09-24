@@ -1659,10 +1659,19 @@ def api_personnel_mi_cuadrilla():
         db = get_db()
 
         # Buscar cuadrilla donde esté el obrero
+        print(f"DEBUG: Buscando cuadrilla para cédula: {cedula_obrero}")
+
+        # Primero buscar solo por cédula (sin filtro activo)
+        cuadrilla_test = db.cuadrillas.find_one({"obreros.cedula": cedula_obrero})
+        print(f"DEBUG: Cuadrilla encontrada sin filtro activo: {cuadrilla_test is not None}")
+        if cuadrilla_test:
+            print(f"DEBUG: Campo activo en BD: {cuadrilla_test.get('activo')}")
+
         cuadrilla = db.cuadrillas.find_one({
             "obreros.cedula": cedula_obrero,
             "activo": True
         })
+        print(f"DEBUG: Cuadrilla encontrada con filtro activo=True: {cuadrilla is not None}")
 
         if not cuadrilla:
             return jsonify({

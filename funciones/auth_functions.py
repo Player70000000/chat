@@ -579,6 +579,11 @@ def middleware_verificar_permisos(niveles_permitidos):
 
                 user_tipo = request.user_data.get('tipo_usuario')
 
+                # DEBUG: Log información del usuario
+                print(f"🔍 DEBUG: user_data completo: {request.user_data}")
+                print(f"🔍 DEBUG: user_tipo extraído: {user_tipo}")
+                print(f"🔍 DEBUG: niveles_permitidos: {niveles_permitidos}")
+
                 # Verificar permisos
                 if user_tipo not in niveles_permitidos:
                     return jsonify({

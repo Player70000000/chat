@@ -1563,10 +1563,19 @@ def verificar_obrero_en_cuadrillas(cedula_obrero):
         # Extraer información de las cuadrillas afectadas
         cuadrillas_info = []
         for cuadrilla in cuadrillas_con_obrero:
+            # Obtener información completa del moderador
+            moderador_data = cuadrilla.get("moderador", {})
+            moderador_nombre = moderador_data.get("nombre", "")
+            moderador_apellidos = moderador_data.get("apellidos", "")
+            moderador_completo = f"{moderador_nombre} {moderador_apellidos}".strip()
+
+            if not moderador_completo:
+                moderador_completo = "N/A"
+
             cuadrilla_info = {
                 "numero_cuadrilla": cuadrilla.get("numero_cuadrilla", "N/A"),
                 "actividad": cuadrilla.get("actividad", "N/A"),
-                "moderador": cuadrilla.get("moderador", {}).get("nombre", "N/A"),
+                "moderador": moderador_completo,
                 "numero_obreros": len(cuadrilla.get("obreros", []))
             }
             cuadrillas_info.append(cuadrilla_info)

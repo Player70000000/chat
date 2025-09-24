@@ -799,3 +799,34 @@ def limpiar_tokens_expirados():
     except Exception as e:
         print(f"Error en limpieza: {e}")
         return False
+
+
+def get_user_from_token():
+    """
+    Extrae y valida el token JWT desde la request actual
+    Devuelve los datos del usuario si el token es válido
+
+    Returns:
+        dict: Datos del usuario o None si token inválido/faltante
+    """
+    try:
+        from flask import request
+
+        # Obtener token del header Authorization
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return None
+
+        # Extraer token (formato: "Bearer TOKEN")
+        try:
+            token = auth_header.split(' ')[1]
+        except IndexError:
+            return None
+
+        # Verificar y decodificar token
+        user_data = verificar_token_jwt(token)
+        return user_data
+
+    except Exception as e:
+        logger.error(f"Error obteniendo usuario desde token: {e}")
+        return None

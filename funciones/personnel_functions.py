@@ -1661,7 +1661,7 @@ def api_personnel_mi_cuadrilla():
         # Buscar cuadrilla donde esté el obrero
         cuadrilla = db.cuadrillas.find_one({
             "obreros.cedula": cedula_obrero,
-            "activa": True
+            "activo": True
         })
 
         if not cuadrilla:
@@ -1671,12 +1671,17 @@ def api_personnel_mi_cuadrilla():
             }), 200
 
         # Formatear respuesta
+        moderador_data = cuadrilla.get("moderador", {})
+        moderador_nombre = f"{moderador_data.get('nombre', '')} {moderador_data.get('apellidos', '')}".strip()
+        if not moderador_nombre:
+            moderador_nombre = "Sin moderador asignado"
+
         cuadrilla_data = {
             "numero_cuadrilla": cuadrilla.get("numero_cuadrilla", "Sin número"),
-            "nombre": cuadrilla.get("nombre", "Sin nombre"),
-            "moderador": cuadrilla.get("moderador", {}).get("nombre_completo", "Sin moderador"),
+            "moderador": moderador_nombre,
             "total_obreros": len(cuadrilla.get("obreros", [])),
-            "activa": cuadrilla.get("activa", False)
+            "activa": cuadrilla.get("activo", False),
+            "actividad": cuadrilla.get("actividad", "Sin actividad asignada")
         }
 
         return jsonify({

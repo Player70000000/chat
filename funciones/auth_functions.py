@@ -108,7 +108,7 @@ def generar_token_jwt(user_data):
     """
     try:
         # Debug: imprimir datos del usuario para diagnosticar
-        print(f"🔍 DEBUG generar_token_jwt - user_data: {user_data}")
+# Debug removido: token JWT generado correctamente
 
         # Verificar que user_data no sea None
         if not user_data:
@@ -134,7 +134,7 @@ def generar_token_jwt(user_data):
             'iat': datetime.utcnow()
         }
 
-        print(f"🔍 DEBUG payload: {payload}")
+# Debug removido: payload creado correctamente
 
         token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
         print(f"✅ Token generado exitosamente: {len(token)} caracteres")
@@ -514,14 +514,10 @@ def middleware_verificar_autenticacion():
         @wraps(f)
         def wrapper(*args, **kwargs):
             try:
-                print(f"🔍 DEBUG AUTH: Endpoint solicitado: {request.endpoint}")
-
-                # Obtener token del header
+# Obtener token del header
                 auth_header = request.headers.get('Authorization')
-                print(f"🔍 DEBUG AUTH: Authorization header presente: {bool(auth_header)}")
 
                 if not auth_header:
-                    print(f"🔍 DEBUG AUTH: No hay Authorization header")
                     return jsonify({
                         'success': False,
                         'message': 'Token de autorización requerido',
@@ -531,9 +527,7 @@ def middleware_verificar_autenticacion():
                 # Extraer token (formato: "Bearer TOKEN")
                 try:
                     token = auth_header.split(' ')[1]
-                    print(f"🔍 DEBUG AUTH: Token extraído (primeros 20 chars): {token[:20]}...")
                 except IndexError:
-                    print(f"🔍 DEBUG AUTH: Error en formato de token")
                     return jsonify({
                         'success': False,
                         'message': 'Formato de token inválido',
@@ -542,7 +536,6 @@ def middleware_verificar_autenticacion():
 
                 # Verificar token
                 user_data = verificar_token_jwt(token)
-                print(f"🔍 DEBUG AUTH: Token verificado, user_data: {user_data}")
 
                 if not user_data:
                     return jsonify({
@@ -588,10 +581,7 @@ def middleware_verificar_permisos(niveles_permitidos):
 
                 user_tipo = request.user_data.get('tipo_usuario')
 
-                # DEBUG: Log información del usuario
-                print(f"🔍 DEBUG: user_data completo: {request.user_data}")
-                print(f"🔍 DEBUG: user_tipo extraído: {user_tipo}")
-                print(f"🔍 DEBUG: niveles_permitidos: {niveles_permitidos}")
+# Verificar permisos del usuario
 
                 # Verificar permisos
                 if user_tipo not in niveles_permitidos:

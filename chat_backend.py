@@ -14,7 +14,7 @@ load_dotenv()
 
 # NUEVO: Importar funciones modulares
 from funciones.database_functions import init_db, get_db_status, get_db, get_client
-from funciones.personnel_functions import api_personnel_moderadores, api_personnel_moderadores_create, api_personnel_moderadores_update, api_personnel_moderadores_delete, api_personnel_moderadores_debug, api_personnel_obreros, api_personnel_obreros_create, api_personnel_obreros_update, api_personnel_obreros_delete, api_personnel_obreros_debug, api_personnel_check_duplicates
+from funciones.personnel_functions import api_personnel_moderadores, api_personnel_moderadores_create, api_personnel_moderadores_update, api_personnel_moderadores_delete, api_personnel_moderadores_debug, api_personnel_obreros, api_personnel_obreros_create, api_personnel_obreros_update, api_personnel_obreros_delete, api_personnel_obreros_debug, api_personnel_check_duplicates, api_personnel_mi_informacion, api_personnel_mi_cuadrilla
 from funciones.cuadrilla_functions import (
     create_cuadrilla, get_cuadrillas, get_cuadrilla_by_id, update_cuadrilla, delete_cuadrilla, get_next_cuadrilla_number_api, get_obreros_disponibles
 )
@@ -682,6 +682,19 @@ def secured_get_next_cuadrilla_number_api():
 @middleware_verificar_permisos(['admin', 'moderador'])
 def secured_get_obreros_disponibles():
     return get_obreros_disponibles()
+
+# NUEVO: Endpoints para información personal de obreros (Solo obreros)
+@app.route('/api/personnel/mi-informacion/', methods=['GET'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['obrero'])
+def secured_api_personnel_mi_informacion():
+    return api_personnel_mi_informacion()
+
+@app.route('/api/personnel/mi-cuadrilla/', methods=['GET'])
+@middleware_verificar_autenticacion()
+@middleware_verificar_permisos(['obrero'])
+def secured_api_personnel_mi_cuadrilla():
+    return api_personnel_mi_cuadrilla()
 
 # Reports routes - gestión de reportes (Admin + Moderador)
 @app.route('/api/reports/moderadores/generar', methods=['POST'])

@@ -1576,3 +1576,114 @@ def verificar_obrero_en_cuadrillas(cedula_obrero):
     except Exception as e:
         logger.error(f"Error verificando obrero en cuadrillas: {str(e)}")
         return False, [], f"Error interno verificando cuadrillas: {str(e)}"
+
+
+# =====================================================
+# ENDPOINTS PARA INFORMACIÓN PERSONAL DE OBREROS
+# =====================================================
+
+def api_personnel_mi_informacion():
+    """
+    Endpoint para que un obrero consulte su propia información personal
+    Solo accesible con token JWT válido de obrero
+    """
+    try:
+        from funciones.auth_functions import get_user_from_token
+
+        # Obtener usuario desde token JWT
+        user_data = get_user_from_token()
+        if not user_data:
+            return jsonify({"error": "Token inválido o expirado"}), 401
+
+        # Solo obreros pueden usar este endpoint
+        if user_data.get('nivel') != 'obrero':
+            return jsonify({"error": "Acceso denegado. Solo para obreros"}), 403
+
+        cedula_obrero = user_data.get('cedula')
+        if not cedula_obrero:
+            return jsonify({"error": "No se pudo identificar la cédula del obrero"}), 400
+
+        db = get_db()
+
+        # Buscar obrero por cédula
+        obrero = db.obreros.find_one({"cedula": cedula_obrero})
+
+        if not obrero:
+            return jsonify({"error": "Obrero no encontrado"}), 404
+
+        # Formatear respuesta (sin _id)
+        obrero_data = {
+            "nombre": obrero.get("nombre", ""),
+            "apellidos": obrero.get("apellidos", ""),
+            "cedula": obrero.get("cedula", ""),
+            "email": obrero.get("email", ""),
+            "telefono": obrero.get("telefono", ""),
+            "talla_ropa": obrero.get("talla_ropa", ""),
+            "talla_zapatos": obrero.get("talla_zapatos", ""),
+            "nivel": obrero.get("nivel", "obrero"),
+            "activo": obrero.get("activo", True),
+            "fecha_creacion": obrero.get("fecha_creacion")
+        }
+
+        return jsonify({
+            "obrero": obrero_data,
+            "mensaje": "Información personal obtenida exitosamente"
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error consultando información personal del obrero: {str(e)}")
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+
+def api_personnel_mi_cuadrilla():
+    """
+    Endpoint para que un obrero consulte su cuadrilla asignada
+    Solo accesible con token JWT válido de obrero
+    """
+    try:
+        from funciones.auth_functions import get_user_from_token
+
+        # Obtener usuario desde token JWT
+        user_data = get_user_from_token()
+        if not user_data:
+            return jsonify({"error": "Token inválido o expirado"}), 401
+
+        # Solo obreros pueden usar este endpoint
+        if user_data.get('nivel') != 'obrero':
+            return jsonify({"error": "Acceso denegado. Solo para obreros"}), 403
+
+        cedula_obrero = user_data.get('cedula')
+        if not cedula_obrero:
+            return jsonify({"error": "No se pudo identificar la cédula del obrero"}), 400
+
+        db = get_db()
+
+        # Buscar cuadrilla donde esté el obrero
+        cuadrilla = db.cuadrillas.find_one({
+            "obreros.cedula": cedula_obrero,
+            "activa": True
+        })
+
+        if not cuadrilla:
+            return jsonify({
+                "cuadrilla": None,
+                "mensaje": "No está asignado a ninguna cuadrilla activa"
+            }), 200
+
+        # Formatear respuesta
+        cuadrilla_data = {
+            "numero_cuadrilla": cuadrilla.get("numero_cuadrilla", "Sin número"),
+            "nombre": cuadrilla.get("nombre", "Sin nombre"),
+            "moderador": cuadrilla.get("moderador", {}).get("nombre_completo", "Sin moderador"),
+            "total_obreros": len(cuadrilla.get("obreros", [])),
+            "activa": cuadrilla.get("activa", False)
+        }
+
+        return jsonify({
+            "cuadrilla": cuadrilla_data,
+            "mensaje": "Información de cuadrilla obtenida exitosamente"
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error consultando cuadrilla del obrero: {str(e)}")
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500

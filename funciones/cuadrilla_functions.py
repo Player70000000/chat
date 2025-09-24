@@ -8,6 +8,7 @@ from datetime import datetime, timezone, timedelta
 from flask import request, jsonify
 from bson import ObjectId
 from funciones.database_functions import get_db
+from funciones.auth_functions import get_creator_info_from_token
 
 # Logger para este módulo
 logger = logging.getLogger(__name__)
@@ -195,9 +196,9 @@ def create_cuadrilla():
             "obreros": obreros_snapshots,
             "numero_obreros": len(obreros_snapshots),
             "fecha_creacion": get_venezuela_time(),
-            "creado_por": data["creado_por"],
+            "creado_por": get_creator_info_from_token(),
             "fecha_modificacion": get_venezuela_time(),
-            "modificado_por": data["creado_por"]
+            "modificado_por": get_creator_info_from_token()
         }
 
         # Insertar en base de datos

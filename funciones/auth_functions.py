@@ -834,3 +834,37 @@ def get_user_from_token():
     except Exception as e:
         logger.error(f"Error obteniendo usuario desde token: {e}")
         return None
+
+
+def get_creator_info_from_token():
+    """
+    Obtiene información del creador desde el token JWT actual
+    Devuelve el formato apropiado para el campo creado_por
+
+    Returns:
+        str: "Admin" si es admin, "moderador - Nombre Apellido" si es moderador, "sistema" si no se puede determinar
+    """
+    try:
+        # Obtener datos del usuario desde el token
+        user_data = get_user_from_token()
+
+        if not user_data:
+            return "sistema"
+
+        tipo_usuario = user_data.get('tipo_usuario', '')
+
+        if tipo_usuario == 'admin':
+            return "Admin"
+        elif tipo_usuario == 'moderador':
+            nombre_completo = user_data.get('nombre_completo', '')
+            if nombre_completo:
+                return f"moderador - {nombre_completo}"
+            else:
+                return "moderador - Sin nombre"
+        else:
+            # Para obreros o tipos desconocidos
+            return "sistema"
+
+    except Exception as e:
+        logger.error(f"Error obteniendo info del creador desde token: {e}")
+        return "sistema"

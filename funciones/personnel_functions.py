@@ -8,6 +8,7 @@ from datetime import datetime, timezone, timedelta
 from flask import request, jsonify
 from bson import ObjectId
 from funciones.database_functions import get_db
+from funciones.auth_functions import get_creator_info_from_token
 
 # Logger para este módulo
 logger = logging.getLogger(__name__)
@@ -430,7 +431,7 @@ def api_personnel_moderadores_create():
             "activo": datos.get('activo', True),
             "nivel": datos.get('nivel', 'moderador'),
             "fecha_creacion": get_venezuela_time(),
-            "creado_por": "sistema"
+            "creado_por": get_creator_info_from_token()
         }
         
         logger.info(f"📄 DOCUMENTO A GUARDAR: {documento_moderador}")
@@ -1127,7 +1128,7 @@ def api_personnel_obreros_create():
             "activo": datos.get('activo', True),
             "nivel": datos.get('nivel', 'obrero'),
             "fecha_creacion": get_venezuela_time(),
-            "creado_por": "sistema"
+            "creado_por": get_creator_info_from_token()
         }
 
         logger.info(f"📄 DOCUMENTO A GUARDAR: {documento_obrero}")
